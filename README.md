@@ -167,7 +167,7 @@ No manual steps. No "you need to run this notebook first." No "change this path.
 
 | ML Lead  | Sam | SR-algobull |
 |------|------|-----------------|
-| Data Engineering Lead | | |
+| Data Engineering Lead |Erika Wooldridge | |
 | ML / DNN Lead | | |
 | CNN Lead | | |
 | NLP Lead | Wendy Zhu | |
