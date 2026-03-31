@@ -68,9 +68,9 @@ def load_raw_data(filename):
     
     return pd.read_csv(filepath)
 
-# =============================================================================
+# ============================================================================================================================
 # Common Data Cleaning & Feature Engineering
-# =============================================================================
+# ============================================================================================================================
 def clean_data(df):
     """Apply common data cleaning steps.
 
@@ -89,105 +89,6 @@ def clean_data(df):
     # cleaning - change all text to lower case for consistency
     df = df.apply(lambda x: x.str.lower() if x.dtype == 'object' else x)
 
-    return df
-
-# =============================================================================
-# Processing & Feature Engineering for City Traffic Accident Data
-# =============================================================================
-def accident_engineer_features(df):
-    """
-    Production-ready feature engineering pipeline.
-    
-    USAGE:
-        df = accident_engineer_features(df)
-    """
-    # 1. Basic Cleaning & Dropping
-    df = df.drop(columns=['Country', 'ID', 'Source'], errors='ignore')
-
-    #Cleans and fills empty columns
-    df = accident_engineer_empty_columns(df)
-
-    #Feature Engineering non-numertical columns
-    df= description_word_count(df)      #Engineer a feature that counts the number of words in the Description column, which may correlate with accident severity or complexity.
-
-    #Categorize Weather Conditions
-    df = process_weather_features(df)
-
-    #one-hot encode 
-    if 'Region' in df.columns:
-        df = pd.concat([df.drop(columns=['Region']), pd.get_dummies(df['Region'], prefix='region', dummy_na=False, dtype=int)], axis=1)
-
-    df = process_road_features(df)              #Creating aggregate features for road and traffic
-    #Retrun the processed DataFrame
-    return df
-
-# =============================================================================
-# Cleans and fills empty columns for City Traffic Accident Data
-# =============================================================================
-def accident_engineer_empty_columns(df):
-    """
-    Cleans and fills empty columns using a combination of logic, 
-    lookup tables, 
-    and local calculations.
-    
-    USAGE:
-        df = accident_engineer_empty_columns(df)
-    """
-
-    #Datetime Conversion
-    time_cols = ['Start_Time', 'End_Time', 'Weather_Timestamp']
-    for col in time_cols:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors='coerce')
-
-    #Time Imputation
-    df['Start_Time'] = df['Start_Time'].fillna(df['Weather_Timestamp'])             #If Start_Time is missing, use Weather_Timestamp as a proxy (assuming weather data is timestamped at the time of the accident)
-    df['End_Time'] = df['End_Time'].fillna(df['Weather_Timestamp'])                 #If End_Time is missing, use Weather_Timestamp as a proxy (assuming weather data is timestamped at the time of the accident)
-    df['Weather_Timestamp'] = df['Weather_Timestamp'].fillna(df['Start_Time'])      #If Weather_Timestamp is missing, use Start_Time as a proxy (assuming weather data is timestamped at the time of the accident)
-
-    #Geographic & Regional Logic
-    df = add_census_regions(df)                                                     #Add Census Region based on State to capture regional patterns in accidents
-    df = create_cluster_regions(df, n_clusters=10)                                  #Create geographic clusters (e.g., using KMeans on lat/lng) to capture local accident hotspots 
-    df = add_intra_region_distances(df, cluster_col='Geo_Cluster')                  #Calculate distance to cluster centers to capture how far an accident is from local hotspots
-
-    # Temporal Features (Hour, Month, Rush Hour)
-    df = create_temporal_features(df)                                               #Extract hour of day, day of week, month, and rush hour flags from Start_Time to capture time-based patterns in accidents
-
-    #Fill Coordinates & Geographic Details
-    if 'End_Lat' in df.columns:
-        df['End_Lat'] = df['End_Lat'].fillna(df['Start_Lat'])
-    if 'End_Lng' in df.columns:
-        df['End_Lng'] = df['End_Lng'].fillna(df['Start_Lng'])
-    
-    df = fill_geographic_data(df)                                               #Use ZIP code lookup or reverse geocoding to fill missing geographic details (e.g., city, county) based on available lat/lng or zip code data
-    df = df.drop(columns=['Street'], errors='ignore')                           #Drop Street column after filling geographic details, as it may be too noisy or sparse to be useful
-   
-    #WEATHER & ENVIRONMENT DATA - Fast processing
-    df = fast_environmental_data(df)                                            #Use local calculations (e.g., sunrise/sunset times based on lat/lng and date) to fill missing environmental data
-    
-    # Drop unnamed numeric-indexed columns
-    df = df.loc[:, ~df.columns.astype(str).str.match(r'^\d+$')]                 # Drop unnamed numeric-indexed columns
-    
-
-    return df
-
-# =============================================================================
-# Processing & Feature Engineering for 311 Service Request Data
-# =============================================================================
-def complaints_engineer_features(df):
-    """Create new features from existing columns.
-
-    Examples:
-    - Parse datetime columns -> hour, day_of_week, month
-    - Create binary flags from categorical data
-    - Bin continuous variables into categories
-    - Interaction features
-
-    Returns:
-        DataFrame with new feature columns
-    """
-    #Create temporal features (e.g., hour of day, day of week, etc.)
-    df = create_temporal_features(df) 
     return df
 
 # =============================================================================
@@ -280,6 +181,87 @@ def load_processed_data(filename):
             f"Run the data pipeline first to generate processed data."
         )
     return pd.read_csv(filepath)
+
+# ============================================================================================================================
+# Processing & Feature Engineering for City Traffic Accident Data
+# ============================================================================================================================
+def accident_engineer_features(df):
+    """
+    Production-ready feature engineering pipeline.
+    
+    USAGE:
+        df = accident_engineer_features(df)
+    """
+    # 1. Basic Cleaning & Dropping
+    df = df.drop(columns=['Country', 'ID', 'Source'], errors='ignore')
+
+    #Cleans and fills empty columns
+    df = accident_engineer_empty_columns(df)
+
+    #Feature Engineering non-numertical columns
+    df= description_word_count(df)      #Engineer a feature that counts the number of words in the Description column, which may correlate with accident severity or complexity.
+
+    #Categorize Weather Conditions
+    df = process_weather_features(df)
+
+    #one-hot encode 
+    if 'Region' in df.columns:
+        df = pd.concat([df.drop(columns=['Region']), pd.get_dummies(df['Region'], prefix='region', dummy_na=False, dtype=int)], axis=1)
+
+    df = process_road_features(df)              #Creating aggregate features for road and traffic
+
+    #Retrun the processed DataFrame
+    return df
+
+# =============================================================================
+# Cleans and fills empty columns for City Traffic Accident Data
+# =============================================================================
+def accident_engineer_empty_columns(df):
+    """
+    Cleans and fills empty columns using a combination of logic, 
+    lookup tables, 
+    and local calculations.
+    
+    USAGE:
+        df = accident_engineer_empty_columns(df)
+    """
+
+    #Datetime Conversion
+    time_cols = ['Start_Time', 'End_Time', 'Weather_Timestamp']
+    for col in time_cols:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors='coerce')
+
+    #Time Imputation
+    df['Start_Time'] = df['Start_Time'].fillna(df['Weather_Timestamp'])             #If Start_Time is missing, use Weather_Timestamp as a proxy (assuming weather data is timestamped at the time of the accident)
+    df['End_Time'] = df['End_Time'].fillna(df['Weather_Timestamp'])                 #If End_Time is missing, use Weather_Timestamp as a proxy (assuming weather data is timestamped at the time of the accident)
+    df['Weather_Timestamp'] = df['Weather_Timestamp'].fillna(df['Start_Time'])      #If Weather_Timestamp is missing, use Start_Time as a proxy (assuming weather data is timestamped at the time of the accident)
+
+    #Geographic & Regional Logic
+    df = add_census_regions(df)                                                     #Add Census Region based on State to capture regional patterns in accidents
+    df = create_cluster_regions(df, n_clusters=10)                                  #Create geographic clusters (e.g., using KMeans on lat/lng) to capture local accident hotspots 
+    df = add_intra_region_distances(df, cluster_col='Geo_Cluster')                  #Calculate distance to cluster centers to capture how far an accident is from local hotspots
+
+    # Temporal Features (Hour, Month, Rush Hour)
+    df = create_temporal_features(df)                                               #Extract hour of day, day of week, month, and rush hour flags from Start_Time to capture time-based patterns in accidents
+
+    #Fill Coordinates & Geographic Details
+    if 'End_Lat' in df.columns:
+        df['End_Lat'] = df['End_Lat'].fillna(df['Start_Lat'])
+    if 'End_Lng' in df.columns:
+        df['End_Lng'] = df['End_Lng'].fillna(df['Start_Lng'])
+    
+    df = fill_geographic_data(df)                                               #Use ZIP code lookup or reverse geocoding to fill missing geographic details (e.g., city, county) based on available lat/lng or zip code data
+    df = df.drop(columns=['Street'], errors='ignore')                           #Drop Street column after filling geographic details, as it may be too noisy or sparse to be useful
+   
+    #WEATHER & ENVIRONMENT DATA - Fast processing
+    df = fast_environmental_data(df)                                            #Use local calculations (e.g., sunrise/sunset times based on lat/lng and date) to fill missing environmental data
+    
+    # Drop unnamed numeric-indexed columns
+    df = df.loc[:, ~df.columns.astype(str).str.match(r'^\d+$')]                 # Drop unnamed numeric-indexed columns
+    
+
+    return df
 
 # =============================================================================
 # Generate a heatmap 
@@ -741,7 +723,6 @@ def process_road_features(df: pd.DataFrame) -> pd.DataFrame:
 # =============================================================================
 # HINT 5: Handling Severity Class Imbalance
 # =============================================================================
-
 def analyze_severity_distribution(df: pd.DataFrame):
     """
     Severity distribution is heavily imbalanced:
@@ -770,3 +751,49 @@ def analyze_severity_distribution(df: pd.DataFrame):
     print(df['Severity'].value_counts().sort_index())
     print(f"\nClass ratios:")
     print(df['Severity'].value_counts(normalize=True).sort_index().round(3))
+
+# =============================================================================
+# HINT 10: Geographic Feature Engineering
+# =============================================================================
+def create_geographic_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Location matters for accident severity prediction.
+
+    Feature ideas:
+    1. State-level patterns (some states have more severe accidents)
+    2. Urban vs. rural (can infer from city population or zip code)
+    3. Latitude as a proxy for climate (northern = more ice/snow)
+    4. Distance from nearest airport (proxy for traffic volume)
+    5. Cluster analysis on lat/lng to find accident hotspots
+
+    Warning: Don't use raw lat/lng as features — they're too specific
+    and lead to overfitting. Instead, bin them or use for clustering.
+    """
+    # State-level average severity (target encoding — be careful of leakage!)
+    # Only compute on training data, then apply to test
+
+    # Latitude bins (rough climate proxy)
+    if 'Start_Lat' in df.columns:
+        df['lat_bin'] = pd.cut(df['Start_Lat'], bins=10, labels=False)
+
+    return df
+
+# ===================================================================================================================================
+# Processing & Feature Engineering for 311 Service Request Data
+# ===================================================================================================================================
+def complaints_engineer_features(df):
+    """Create new features from existing columns.
+
+    Examples:
+    - Parse datetime columns -> hour, day_of_week, month
+    - Create binary flags from categorical data
+    - Bin continuous variables into categories
+    - Interaction features
+
+    Returns:
+        DataFrame with new feature columns
+    """
+    #Create temporal features (e.g., hour of day, day of week, etc.)
+    df = create_temporal_features(df) 
+    return df
+
