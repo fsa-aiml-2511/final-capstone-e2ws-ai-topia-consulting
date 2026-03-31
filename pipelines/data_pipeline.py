@@ -159,8 +159,15 @@ def save_processed_data(df, filename):
     """
     PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
     output_path = PROCESSED_DATA_DIR / filename
+
+    # Drop the file if it already exists
+    if output_path.exists():
+        output_path.unlink()
+        print(f"Existing file {filename} dropped.")
+
+    # Save the new version
     df.to_csv(output_path, index=False)
-    print(f"Saved processed data to {output_path}")
+    print(f"Saved fresh processed data to {output_path}")
 
 # =============================================================================
 # Load previously processed data 
@@ -182,6 +189,17 @@ def load_processed_data(filename):
         )
     return pd.read_csv(filepath)
 
+# =============================================================================
+# Changes true and false to 1 and 0
+# =============================================================================
+def convert_bools_to_ints(df):
+    # 1. Find all columns that are of type 'bool'
+    bool_cols = df.select_dtypes(include=['bool']).columns
+    
+    # 2. Convert only those columns to integer (True -> 1, False -> 0)
+    df[bool_cols] = df[bool_cols].astype(int)
+    
+    return df
 # ============================================================================================================================
 # Processing & Feature Engineering for City Traffic Accident Data
 # ============================================================================================================================
@@ -207,9 +225,21 @@ def accident_engineer_features(df):
     #one-hot encode 
     if 'Region' in df.columns:
         df = pd.concat([df.drop(columns=['Region']), pd.get_dummies(df['Region'], prefix='region', dummy_na=False, dtype=int)], axis=1)
+    if 'Wind_Direction' in df.columns:
+        df = pd.concat([df.drop(columns=['Wind_Direction']), pd.get_dummies(df['Wind_Direction'], prefix='wind', dummy_na=False, dtype=int)], axis=1)
 
     df = process_road_features(df)              #Creating aggregate features for road and traffic
 
+    # Find top 5 zipcde in each region and group the rest into "other" category
+    df = create_zipcode_features(df)
+
+    # Group cities outside of top 20 into "Other" category to reduce cardinality
+    df= encode_top_geo_features(df)
+
+    # Drop any remaining irrelevant or redundant columns (e.g., Street, if it was too noisy and we filled geographic details from lat/lng)
+    df = df.drop(columns=['State', 'Zipcode', 'City', 'County'], errors='ignore')
+
+    df=convert_bools_to_ints(df) #Convert boolean columns to integers for modeling
     #Retrun the processed DataFrame
     return df
 
@@ -776,6 +806,47 @@ def create_geographic_features(df: pd.DataFrame) -> pd.DataFrame:
     if 'Start_Lat' in df.columns:
         df['lat_bin'] = pd.cut(df['Start_Lat'], bins=10, labels=False)
 
+    return df
+
+# =============================================================================
+# Find top 5 zipcode in each region and group the rest into "other" category
+# =============================================================================
+def create_zipcode_features(df: pd.DataFrame) -> pd.DataFrame:
+    # Defines your existing region columns from add_census_regions
+    region_cols = ['region_Midwest', 'region_Northeast', 'region_South', 'region_West', 'region_Other']
+    
+    # This finds which region column is 1 for every row
+    temp_region = df[region_cols].idxmax(axis=1)
+
+    #For each region, find the top 5 zipcodes
+    is_top_5 = df.groupby(temp_region)['Zipcode'].transform(
+        lambda x: x.isin(x.value_counts().nlargest(5).index)
+    )
+
+    #Create the new labels: "Region_Zip" if in top 5, else "Region_other"
+    df['Zip_Grouped'] = temp_region + "_" + df['Zipcode'].astype(str)
+    df.loc[~is_top_5, 'Zip_Grouped'] = temp_region + "_other"
+
+    #One-Hot Encode the original
+    df = pd.get_dummies(df, columns=['Zip_Grouped'], prefix='Zip')
+    
+    return df
+
+# =============================================================================
+# Find top 20 cities and counties and group the rest into "Other" category, then one-hot encode
+# =============================================================================
+def encode_top_geo_features(df, columns=['City', 'County']):
+    for col in columns:
+        # 1. Find the top 20 values for the current column
+        top_20 = df[col].value_counts().nlargest(20).index
+        
+        # 2. Rename anything not in the top 20 to 'Other'
+        df[col] = df[col].where(df[col].isin(top_20), 'Other')
+    
+    # 3. One-Hot Encode both columns at once
+    # prefix=['City', 'Cty'] keeps the new column names clean
+    df = pd.get_dummies(df, columns=columns, prefix=['City', 'Cty'])
+    
     return df
 
 # ===================================================================================================================================
