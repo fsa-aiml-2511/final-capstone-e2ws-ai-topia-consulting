@@ -17,6 +17,9 @@ import numpy as np
 from collections import Counter
 import re
 
+
+from imblearn.over_sampling import SMOTE
+
 #Create interactive map
 import os
 import folium 
@@ -140,12 +143,21 @@ def split_data(X, y, test_size=0.2, random_state=42):
     Returns:
         X_train, X_val, y_train, y_val
     """
-    return train_test_split(
-        X, y,
-        test_size=test_size,
-        random_state=random_state,
-        stratify=y,
+   #Split first (using stratify as you already noted!)
+    X_train, X_val, y_train, y_val = train_test_split(
+        X, y, 
+        test_size=test_size, 
+        random_state=random_state, 
+        stratify=y
     )
+    
+    #Resample ONLY the training data
+    smote = SMOTE(random_state=random_state)
+
+    X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
+    
+    return X_train_res, X_val, y_train_res, y_val
+    
 
 # =============================================================================
 # Save processed data 
@@ -267,11 +279,6 @@ def accident_engineer_empty_columns(df):
     df['End_Time'] = df['End_Time'].fillna(df['Weather_Timestamp'])                 #If End_Time is missing, use Weather_Timestamp as a proxy (assuming weather data is timestamped at the time of the accident)
     df['Weather_Timestamp'] = df['Weather_Timestamp'].fillna(df['Start_Time'])      #If Weather_Timestamp is missing, use Start_Time as a proxy (assuming weather data is timestamped at the time of the accident)
 
-    #Geographic & Regional Logic
-    df = add_census_regions(df)                                                     #Add Census Region based on State to capture regional patterns in accidents
-    df = create_cluster_regions(df, n_clusters=10)                                  #Create geographic clusters (e.g., using KMeans on lat/lng) to capture local accident hotspots 
-    df = add_intra_region_distances(df, cluster_col='Geo_Cluster')                  #Calculate distance to cluster centers to capture how far an accident is from local hotspots
-
     # Temporal Features (Hour, Month, Rush Hour)
     df = create_temporal_features(df)                                               #Extract hour of day, day of week, month, and rush hour flags from Start_Time to capture time-based patterns in accidents
 
@@ -281,9 +288,12 @@ def accident_engineer_empty_columns(df):
     if 'End_Lng' in df.columns:
         df['End_Lng'] = df['End_Lng'].fillna(df['Start_Lng'])
     
+     #Geographic & Regional Logic
     df = fill_geographic_data(df)                                               #Use ZIP code lookup or reverse geocoding to fill missing geographic details (e.g., city, county) based on available lat/lng or zip code data
     df = df.drop(columns=['Street'], errors='ignore')                           #Drop Street column after filling geographic details, as it may be too noisy or sparse to be useful
-   
+    df = add_census_regions(df)                                                     #Add Census Region based on State to capture regional patterns in accidents
+    df = create_cluster_regions(df, n_clusters=10)                                  #Create geographic clusters (e.g., using KMeans on lat/lng) to capture local accident hotspots 
+    df = add_intra_region_distances(df, cluster_col='Geo_Cluster')                  #Calculate distance to cluster centers to capture how far an accident is from local hotspots
     #WEATHER & ENVIRONMENT DATA - Fast processing
     df = fast_environmental_data(df)                                            #Use local calculations (e.g., sunrise/sunset times based on lat/lng and date) to fill missing environmental data
     
@@ -848,6 +858,27 @@ def encode_top_geo_features(df, columns=['City', 'County']):
     df = pd.get_dummies(df, columns=columns, prefix=['City', 'Cty'])
     
     return df
+
+def drop_low_variance_columns(df, threshold=0.99):
+    """
+    This function removes features that are functionally constant 
+    (i.e., where a single value occupies more than the threshold percentage of the total rows),
+    because a column where almost every row is the same provides no "contrast" for the model to learn from.
+    """
+    # Identify columns to drop
+    cols_to_drop = []
+    
+    for col in df.columns:
+        # Get the proportion of the most frequent value
+        top_value_ratio = df[col].value_counts(normalize=True).iloc[0]
+        
+        if top_value_ratio > threshold:
+            cols_to_drop.append(col)
+            
+    print(f"Dropped {len(cols_to_drop)} columns with > {threshold*100}% dominance.")
+    print(f"Columns dropped: {cols_to_drop}")
+    
+    return df.drop(columns=cols_to_drop)
 
 # ===================================================================================================================================
 # Processing & Feature Engineering for 311 Service Request Data
