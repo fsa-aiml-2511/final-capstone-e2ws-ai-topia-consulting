@@ -86,7 +86,13 @@ def accident_engineer_features(df):
     df= encode_top_geo_features(df)
 
     # Drop any remaining irrelevant or redundant columns (e.g., Street, if it was too noisy and we filled geographic details from lat/lng)
-    df = df.drop(columns=['State', 'Zipcode', 'City', 'County'], errors='ignore')
+    df = df.drop(columns=['State', 'Zipcode', 'City', 'County', 'Start_Lat', 'Start_Lng', 'End_Lat', 'End_Lng'], errors='ignore')
+
+    #logic for the matching dangerous weather patterns
+    df = dangerous_conditions_score(df)
+
+    #Engineer aggregate features for road conditions (e.g., total_road_features, has_traffic_control)
+    df= engineer_road_features(df) 
 
     df=convert_bools_to_ints(df) #Convert boolean columns to integers for modeling
     #Retrun the processed DataFrame
@@ -695,6 +701,110 @@ def encode_top_geo_features(df, columns=['City', 'County']):
     df = pd.get_dummies(df, columns=columns, prefix=['City', 'Cty'])
     
     return df
+# ==================================================================================================
+# A WAY TO COMBINE WEATHER CONDITIONS INTO A SINGLE RISK SCORE
+# ==================================================================================================
+def dangerous_conditions_score(df): 
+    df = df.copy()
+    
+    # Apply the scoring function to every row
+    print("Engineering DangerousScore...")
+    df['DangerousScore'] = df.apply(calculate_dangerous_score, axis=1)
+    
+    # NOW drop the columns once the scoring is done
+    cols_to_drop = [
+        'Temperature(F)', 'Wind_Chill(F)', 'Humidity(%)', 'Pressure(in)', 
+        'Visibility(mi)', 'Wind_Speed(mph)', 'Precipitation(in)', 
+        'Weather_Condition', 'Sunrise_Sunset', 'Astronomical_Twilight'
+    ]
+    
+    # Only drop columns that actually exist in the dataframe
+    existing_drops = [c for c in cols_to_drop if c in df.columns]
+    df = df.drop(columns=existing_drops)
+    
+    return df
 
+def calculate_dangerous_score(row): 
+    score = 0
+    # Get weather text and handle potential missing values
+    weather = str(row.get('Weather_Condition', '')).strip().lower()
 
+    # 1. Visibility
+    visibility = row.get('Visibility(mi)')
+    if pd.notna(visibility):
+        if visibility < 1: score += 3
+        elif visibility < 3: score += 2
+        elif visibility < 5: score += 1
 
+    # 2. Precipitation
+    precip = row.get('Precipitation(in)')
+    if pd.notna(precip):
+        if precip > 0.3: score += 2
+        elif precip > 0: score += 1
+    
+    # 3. Temperature / Wind Chill
+    temp = row.get('Temperature(F)')
+    wind_chill = row.get('Wind_Chill(F)')
+    effective_temp = wind_chill if pd.notna(wind_chill) else temp
+
+    if pd.notna(effective_temp):
+        if effective_temp < 32: score += 2   # freezing
+        elif effective_temp > 100: score += 1 # extreme heat
+
+    # 4. Wind speed
+    wind = row.get('Wind_Speed(mph)')
+    if pd.notna(wind):
+        if wind > 40: score += 2
+        elif wind > 25: score += 1
+
+    # 5. Darkness
+    if row.get('Sunrise_Sunset') == 'Night': score += 1
+    if row.get('Astronomical_Twilight') == 'Night': score += 1
+
+    # 6. Weather text categories
+    if any(term in weather for term in ['tornado', 'thunderstorm', 'hail', 'squalls']):
+        score += 3
+    elif any(term in weather for term in ['freezing', 'sleet', 'ice', 'wintry']):
+        score += 3
+    elif any(term in weather for term in ['fog', 'mist', 'haze', 'smoke']):
+        score += 2
+    elif any(term in weather for term in ['rain', 'snow', 'drizzle']):
+        score += 1
+
+    return score
+
+def engineer_road_features(df):
+    """
+    Groups individual boolean road features into a single 'n_road_features' count
+    and a binary 'has_traffic_control' flag.
+    """
+    # Create a copy to avoid SettingWithCopy warnings
+    df = df.copy()
+
+    # 1. Define all possible road features
+    road_features = [
+        'Amenity', 'Bump', 'Crossing', 'Give_Way', 'Junction',
+        'No_Exit', 'Railway', 'Roundabout', 'Station', 'Stop',
+        'Traffic_Calming', 'Traffic_Signal', 'Turning_Loop'
+    ]
+    
+    # Filter for features that actually exist in the current dataframe
+    existing = [f for f in road_features if f in df.columns]
+    print(f"Aggregating {len(existing)} road features...")
+
+    # 2. Total road features present (Sum of booleans)
+    df['n_road_features'] = df[existing].sum(axis=1)
+
+    # 3. Traffic control presence (Specific Subset)
+    control_features = ['Traffic_Signal', 'Stop', 'Give_Way', 'Traffic_Calming']
+    existing_control = [f for f in control_features if f in df.columns]
+    
+    # Create binary flag (1 if ANY control features are true, else 0)
+    df['has_traffic_control'] = df[existing_control].any(axis=1).astype(int)
+
+    # 4. Remove original individual road features to reduce dimensionality
+    # This helps models like Random Forest focus on the aggregated signal
+    df = df.drop(columns=existing)
+    
+    print(f"Feature engineering complete. New columns: ['n_road_features', 'has_traffic_control']")
+    return df
