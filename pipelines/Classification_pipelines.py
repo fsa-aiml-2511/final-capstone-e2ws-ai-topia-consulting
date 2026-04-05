@@ -6,12 +6,9 @@ import numpy as np
 
 # Visualization
 import matplotlib.pyplot as plt
-from seaborn.objects import Plot
-from sklearn.inspection import permutation_importance
 
 # Sklearn - preprocessing
 from sklearn.ensemble import HistGradientBoostingClassifier
-from sklearn.inspection import permutation_importance
 from sklearn.decomposition import PCA
 
 # Sklearn - models
@@ -29,12 +26,12 @@ from sklearn.model_selection import LearningCurveDisplay
 
 # Sklearn - evaluation
 from sklearn.metrics import (
-    accuracy_score, precision_score, f1_score, classification_report, confusion_matrix,  RocCurveDisplay, PrecisionRecallDisplay
+    accuracy_score, precision_score, f1_score,  RocCurveDisplay, PrecisionRecallDisplay
 )
-
 
 from imblearn.over_sampling import SMOTE
 
+from data_pipeline import plot_feature_importance, print_model_report, plot_prediction_probabilities
 
 # Settings
 import warnings
@@ -46,9 +43,9 @@ if str(root_path) not in sys.path:
     sys.path.insert(0, str(root_path))
 
 
-# =============================================================================
-# This helper function evaluates any model - you'll use it throughout this notebook
-# =============================================================================
+# ====================================================================================
+# classification metrics for Train and Test
+# ====================================================================================
 def evaluate_classification_model(trained_model, X_train, X_test, y_train, y_test, model_name):
     """Train model and return classification metrics for Train and Test."""
     # Train the model
@@ -163,76 +160,6 @@ def engineer_classification_features(df):
 
     return df
 
-# =============================================================================
-# This helper function extracts, prints, and plots feature importances
-# =============================================================================
-def plot_feature_importance(trained_model, X_val, y_val, model_name, top_n=30):
-    """
-    Calculates Permutation Importance for any model type.
-    Works for HistGradientBoosting, SVM, KNN, and Tree-based models.
-    """
-    print(f"\nCalculating feature importance for {model_name}...")
-    
-    # 1. Calculate Permutation Importance
-    # We use the validation/test set here to see which features actually matter for prediction
-    result = permutation_importance(
-       trained_model, X_val, y_val, n_repeats=5, random_state=42, n_jobs=-1
-    )
-
-    # 2. Map to column names
-    feat_imp = pd.DataFrame({
-        "feature": X_val.columns if isinstance(X_val, pd.DataFrame) else [f"Feature {i}" for i in range(X_val.shape[1])],
-        "importance": result.importances_mean
-    })
-
-    # 3. Sort and filter top N
-    feat_imp = feat_imp.sort_values("importance", ascending=False).head(top_n)
-
-    # 4. Print results
-    print(f"Top {top_n} features for {model_name}:")
-    for i, row in feat_imp.iterrows():
-        print(f"  {row['feature']}: {row['importance']:.4f}")
-
-    # 5. Plot
-    plt.figure(figsize=(10, 8))
-    plt.barh(feat_imp["feature"][::-1], feat_imp["importance"][::-1], color='teal')
-    plt.xlabel("Decrease in Accuracy (Permutation Importance)")
-    plt.ylabel("Feature")
-    plt.title(f"{model_name} - Top {top_n} Feature Importances")
-    plt.grid(axis='x', linestyle='--', alpha=0.7)
-    plt.tight_layout()
-    plt.show()
-
-    return feat_imp
-# =============================================================================
-# This helper function prints detailed diagnostic reports for the model
-# =============================================================================
-def print_model_report(y_test, y_test_pred, model_name):
-    """Prints the official Scikit-Learn Classification 
-    Example Output:
-                  precision    recall  f1-score   support
-
-               1       0.73      0.15      0.25       870
-               2       0.85      0.96      0.91     79534
-               3       0.70      0.39      0.50     16808
-               4       0.62      0.11      0.18      2646
-
-        accuracy                           0.84     99858
-       macro avg       0.72      0.40      0.46     99858
-    weighted avg       0.82      0.84      0.81     99858
-    """
-    print(f"\n" + "="*60)
-    print(f" MODEL: {model_name}")
-    print("="*60)
-    
-    # This produces the exact precision, recall, f1-score, support table
-    # We don't hardcode target_names so it stays dynamic for different datasets
-    report = classification_report(y_test, y_test_pred)
-    print(report)
-    
-    print("Confusion Matrix:")
-    print(confusion_matrix(y_test, y_test_pred))
-    print("="*60 + "\n")
 
 # =============================================================================
 # This helper function Prediction Probability Histograms for each class
@@ -294,31 +221,7 @@ def plot_pca_2d(X, y, title="PCA 2D Projection"):
     
     print(f"Explained variance ratio (first 2 components): {pca.explained_variance_ratio_.sum():.2%}")
 
-# =============================================================================
-# This helper function plots how confident the model is in its predictions
-# =============================================================================
-def plot_prediction_probabilities(trained_model, X_test, model_name):
-    """Plots a histogram of the max predicted probabilities for each sample."""
-    # Check if model supports probability estimates
-    if not hasattr(trained_model, "predict_proba"):
-        print(f"{model_name} does not support predict_proba.")
-        return
 
-    # Get the probabilities for each class
-    probs = trained_model.predict_proba(X_test)
-    
-    # Take the highest probability for each prediction (the confidence level)
-    max_probs = np.max(probs, axis=1)
-
-    plt.figure(figsize=(10, 6))
-    plt.hist(max_probs, bins=30, color='coral', edgecolor='black', alpha=0.7)
-    plt.axvline(x=0.5, color='red', linestyle='--', label='Random Guessing (50%)')
-    plt.xlabel('Predicted Probability (Confidence)')
-    plt.ylabel('Number of Samples')
-    plt.title(f'Prediction Confidence Distribution - {model_name}')
-    plt.legend()
-    plt.grid(axis='y', alpha=0.3)
-    plt.show()
     
 # ======================================================================================================
 # Hist Gradient Boosting Classification Component
