@@ -12,6 +12,7 @@ from sklearn.metrics import (
     accuracy_score, precision_score, f1_score, classification_report, confusion_matrix,  RocCurveDisplay, PrecisionRecallDisplay
 )
 from data_pipeline import plot_feature_importance, print_model_report, plot_prediction_probabilities
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 # Settings
 import warnings
@@ -49,6 +50,9 @@ def evaluate_neural_network_model(trained_model, X_train, X_test, y_train, y_tes
 
 from sklearn.neural_network import MLPClassifier
 
+# ========================================================================================
+# Trains a Feedforward Neural Network (MLP).
+# ========================================================================================
 def run_mlp_classifier(X_train, X_test, y_train, y_test, **kwargs):
     """
     Trains a Feedforward Neural Network (MLP).
@@ -77,3 +81,18 @@ def run_mlp_classifier(X_train, X_test, y_train, y_test, **kwargs):
     plot_prediction_probabilities(trained_model, X_test, "MLP Neural Net")
     
     return results, trained_model
+
+# ========================================================================================
+# Trains a Feedforward Neural Network (MLP).
+# ========================================================================================
+def extract_text_features(df, text_col, max_features=1000):
+    """
+    Converts cleaned text into a TF-IDF matrix.
+    Higher scores = more unique/important words.
+    """
+    tfidf = TfidfVectorizer(max_features=max_features, ngram_range=(1, 2))
+    tfidf_matrix = tfidf.fit_transform(df[text_col])
+    
+    # Convert to a DataFrame to join back to your main features
+    tfidf_df = pd.DataFrame(tfidf_matrix.toarray(), columns=tfidf.get_feature_names_out())
+    return tfidf_df, tfidf

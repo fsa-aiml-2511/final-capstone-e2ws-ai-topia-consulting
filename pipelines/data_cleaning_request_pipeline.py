@@ -55,11 +55,11 @@ def complaints_engineer_features(df, text_col='complaint_type', date_col='create
 
     # Create temporal features (hour, day, etc.)
     if date_col in df.columns:
-        df = create_temporal_features(df, date_col) 
+        df = create_temporal_features(df) 
         
     # Extract Top 20 Word Features from Description
     if desc_col in df.columns:
-        df = description_word_count(df, desc_col)
+        df = description_word_count(df)
         
     return df
 
