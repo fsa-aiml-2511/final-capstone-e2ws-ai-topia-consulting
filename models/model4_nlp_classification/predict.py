@@ -259,33 +259,29 @@ def load_artifacts():
 
 
 def load_agency_name_map() -> dict:
-    candidates = [
-        PROCESSED_DATA / "urbanpulse_311_complaints_cleaned.csv",
-        RAW_DATA / "urbanpulse_311_complaints_bilingual.csv",
-        RAW_DATA / "urbanpulse_311_complaints.csv",
-        BASE_DIR / "urbanpulse_311_complaints.csv",
-    ]
-    for path in candidates:
-        if not path.exists():
-            continue
-        try:
-            df = pd.read_csv(path, usecols=lambda c: c.lower() in {"agency", "agency_name"})
-        except Exception:
-            continue
-        lower_cols = {c.lower(): c for c in df.columns}
-        if "agency" not in lower_cols or "agency_name" not in lower_cols:
-            continue
-        agency_col = lower_cols["agency"]
-        agency_name_col = lower_cols["agency_name"]
-        mapping = df[[agency_col, agency_name_col]].dropna().astype(str).drop_duplicates()
-        mapping[agency_col] = mapping[agency_col].str.strip().str.upper()
-        mapping[agency_name_col] = mapping[agency_name_col].str.strip()
-        agency_map = mapping.drop_duplicates(subset=[agency_col]).set_index(agency_col)[agency_name_col].to_dict()
-        if agency_map:
-            LOGGER.info("Loaded agency_name mapping from %s with %s entries", path, len(agency_map))
-            return agency_map
-    LOGGER.warning("Could not build agency_name map from available files")
-    return {}
+    """
+    Return a static mapping of agency code -> agency name.
+    This replaces file-based lookup for reliability and speed.
+    """
+    agency_map = {
+        "DCWP": "Department of Consumer and Worker Protection",
+        "DEP": "Department of Environmental Protection",
+        "DHS": "Department of Homeless Services",
+        "DOB": "Department of Buildings",
+        "DOE": "Department of Education",
+        "DOHMH": "Department of Health and Mental Hygiene",
+        "DOT": "Department of Transportation",
+        "DPR": "Department of Parks and Recreation",
+        "DSNY": "Department of Sanitation",
+        "HPD": "Department of Housing Preservation and Development",
+        "NYPD": "New York City Police Department",
+        "OOS": "Office of the Sheriff",
+        "OTI": "Office of Technology and Innovation",
+        "TLC": "Taxi and Limousine Commission",
+    }
+
+    LOGGER.info("Loaded static agency_name mapping with %s entries", len(agency_map))
+    return agency_map
 
 
 def detect_test_file() -> Path:
@@ -420,10 +416,10 @@ def predict_dual(artifacts, test_data: pd.DataFrame, agency_map: dict) -> pd.Dat
     return pd.DataFrame({
         "id": test_data["id"],
         "predicted_category": cat_pred_labels,
-        #"category_confidence": np.round(cat_conf, 6),
+        "category_confidence": np.round(cat_conf, 6),
         "recommended_agency": route_pred_labels,
-        #"recommended_agency_name": pd.Series(route_pred_labels).map(agency_map).fillna("Unknown Agency"),
-        #"routing_confidence": np.round(route_conf, 6),
+        "recommended_agency_name": pd.Series(route_pred_labels).map(agency_map).fillna("Unknown Agency"),
+        "routing_confidence": np.round(route_conf, 6),
     })
 
 
