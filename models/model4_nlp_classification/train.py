@@ -16,7 +16,7 @@ from pathlib import Path
 
 PROCESSED_DATA = Path("data/processed/")
 SAVED_MODEL_DIR = Path("models/model4_nlp_classification/saved_model/")
-
+from pipelines.data_pipeline import load_raw_data, clean_data, accident_engineer_features, complaints_engineer_features, save_processed_data, drop_low_variance_columns
 
 def load_data():
     """Load text data from data/processed/.
@@ -25,7 +25,8 @@ def load_data():
         from pipelines.data_pipeline import load_processed_data
         df = load_processed_data()
     """
-    # TODO: Load your text dataset
+    df= load_raw_data("urbanpulse_311_complaints.csv")
+    return df
     raise NotImplementedError
 
 
@@ -41,7 +42,10 @@ def preprocess_text(texts):
 
     IMPORTANT: Apply the SAME preprocessing at prediction time.
     """
-    # TODO: Clean your text data
+    #Clean and engineer features for the 311 Complaints Database
+    df= clean_data(df)                            #Clean the data (handle missing values, convert data types, etc.)
+    df= complaints_engineer_features(df)         #Engineer features specific to 311 complaints (e.g., complaint type, resolution time, etc.)
+    return df
     raise NotImplementedError
 
 
