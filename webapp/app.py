@@ -113,6 +113,15 @@ def load_nlp_assets():
     vectorizer = joblib.load("models/model4_nlp_classification/saved_model/vectorizer.joblib")
     return model, vectorizer
 
+@st.cache_resource
+def load_innovation_model():
+    import joblib
+    model   = joblib.load("models/model5_innovation/saved_model/model.joblib")
+    enc     = joblib.load("models/model5_innovation/saved_model/ordinal_encoder.joblib")
+    le      = joblib.load("models/model5_innovation/saved_model/label_encoder.joblib")
+    metrics = joblib.load("models/model5_innovation/saved_model/metrics.joblib")
+    return model, enc, le, metrics
+
 # ===========================================================================
 # 3. ROUTING & PAGES
 # ===========================================================================
@@ -265,10 +274,57 @@ elif model_choice == "Model 4: 311 Classifier (NLP)":
 
 # --- MODEL 5: INNOVATION ---
 elif model_choice == "Model 5: Innovation Module":
-    st.header("💡 Vanguard Innovation Lab")
-    st.write("This module explores advanced predictive maintenance and city planning scenarios.")
-    # Add your unique Vanguard Systems AI feature here
-    st.warning("Vanguard Module: Training data integration in progress.")
+    st.header("💡 311 Complaint Resolution Urgency Predictor")
+    st.write("Predict whether a 311 service request will take a short, moderate, or long time to resolve — enabling smarter dispatch and proactive SLA management.")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        complaint_type = st.selectbox("Complaint Type", [
+            "Noise - Residential", "HEAT/HOT WATER", "Street Light Condition",
+            "Blocked Driveway", "Illegal Parking", "Noise - Commercial",
+            "Rodent", "Water System", "Graffiti", "Pothole",
+        ])
+        agency = st.selectbox("Agency", ["NYPD", "DOT", "DSNY", "DEP", "HPD", "DPR", "Other"])
+    with col2:
+        borough = st.selectbox("Borough", ["MANHATTAN", "BROOKLYN", "QUEENS", "BRONX", "STATEN ISLAND"])
+        channel = st.selectbox("Submission Channel", ["PHONE", "ONLINE", "MOBILE", "OTHER"])
+
+    col3, col4 = st.columns(2)
+    with col3:
+        complaint_date = st.date_input("Complaint Date")
+    with col4:
+        complaint_hour = st.slider("Hour of Day", 0, 23, 12)
+
+    if st.button("Predict Resolution Urgency"):
+        try:
+            model, enc, le, metrics = load_innovation_model()
+
+            day_of_week = complaint_date.weekday()
+            month       = complaint_date.month
+            is_weekend  = int(day_of_week >= 5)
+
+            cat_input = np.array([[complaint_type, agency, borough, channel]])
+            X_cat     = enc.transform(cat_input)
+            X_num     = np.array([[complaint_hour, day_of_week, month, is_weekend]])
+            X         = np.hstack([X_cat, X_num])
+
+            proba      = model.predict_proba(X)[0]
+            pred_enc   = np.argmax(proba)
+            prediction = le.inverse_transform([pred_enc])[0]
+            conf       = float(proba[pred_enc])
+
+            label_map  = {"high_risk": "High Risk (5+ days)", "medium_risk": "Medium Risk (1–5 days)", "low_risk": "Low Risk (same day)"}
+            color_map  = {"high_risk": "error", "medium_risk": "warning", "low_risk": "success"}
+            display    = label_map.get(prediction, prediction)
+
+            st.divider()
+            getattr(st, color_map.get(prediction, "info"))(f"Resolution Urgency: **{display}**")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Urgency Level", display.split("(")[0].strip())
+            c2.metric("Confidence", f"{conf:.1%}")
+            c3.metric("Model F1 Score", f"{metrics['weighted_f1']:.4f}")
+        except Exception as e:
+            st.error(f"Error loading Innovation Model: {e}")
 
 # ===========================================================================
 # 4. FOOTER
