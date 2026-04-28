@@ -149,16 +149,24 @@ elif model_choice == "Model 1: Traffic Severity (ML)":
         time_of_day = st.selectbox("Time Window", ["Morning", "Afternoon", "Evening", "Night"])
 
     if st.button("Calculate Severity Risk"):
+        road_mapping    = {"Local": 0, "Arterial": 1, "Highway": 2}
+        weather_mapping = {"Clear": 0, "Rain": 1, "Fog": 2, "Snow": 3}
+        time_mapping    = {"Morning": 0, "Afternoon": 1, "Evening": 2, "Night": 3}
+
         try:
             model = load_ml_model()
-            # Note: Ensure these column names match your training data exactly
-            input_df = pd.DataFrame([{"road_type": road_type, "speed_limit": speed_limit, "weather": weather, "time": time_of_day}])
-            
-            prediction = model.predict(input_df)[0]
-            conf = np.max(model.predict_proba(input_df))
-            
+            input_data = pd.DataFrame({
+                "road_type":   [road_mapping[road_type]],
+                "weather":     [weather_mapping[weather]],
+                "time":        [time_mapping[time_of_day]],
+                "speed_limit": [speed_limit],
+            })
+            prediction = model.predict(input_data)
+            conf = np.max(model.predict_proba(input_data))
             st.divider()
-            st.metric("Risk Level", f"Severity {prediction}", delta=f"{conf:.1%} Confidence")
+            st.metric("Risk Level", f"Severity {prediction[0]}", delta=f"{conf:.1%} Confidence")
+        except KeyError as e:
+            st.error(f"Mapping error: {e}. Please ensure the category names match exactly.")
         except Exception as e:
             st.error(f"Error loading Model 1: {e}")
 
