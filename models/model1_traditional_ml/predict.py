@@ -48,27 +48,36 @@ def predict(model, scaler, feature_cols, test_df):
 
 
 def main():
-    # Load model
-    model = load_model()
+    # 1. Load the model and its supporting artifacts
+    model, scaler, le, feature_cols = load_model()
 
-    # Load test data
-    # TODO: Update this path to match your test data file
-    # test_df = pd.read_csv(TEST_DATA_DIR / "test_data_file.csv")
+    # 2. Load the test data (Instructor will place this in test_data/)
+    # For local testing, ensure city_traffic_accidents.csv is in test_data/
+    test_file = TEST_DATA_DIR / "city_traffic_accidents.csv"
+    if not test_file.exists():
+        print(f"Error: {test_file} not found.")
+        return
 
-    # Generate predictions
-    # predictions = predict(model, test_df)
+    test_df = pd.read_csv(test_file)
 
-    # Save results — MUST match output template exactly
-    # results = pd.DataFrame({
-    #     "id": test_df["id"],
-    #     "prediction": predictions,
-    #     "probability": model.predict_proba(X_test)[:, 1],
-    #     "confidence": confidence_scores,
-    # })
-    # results.to_csv(OUTPUT_FILE, index=False)
+    # 3. Generate predictions
+    # Note: Using the 'id' column from the original test data for the output
+    preds, probs = predict(model, scaler, feature_cols, test_df)
 
+    # 4. Format the output to match Model 1 template: id, prediction, probability, confidence
+    results = pd.DataFrame({
+        'id': test_df['id'],                 # Original record ID
+        'prediction': le.inverse_transform(preds), # Convert 0/1/2 back to Severity labels
+        'probability': probs,                # The raw probability
+        'confidence': probs                  # In many cases, confidence = max probability
+    })
+
+    # 5. Save to the required location
+    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    results.to_csv(OUTPUT_FILE, index=False)
     print(f"Predictions saved to {OUTPUT_FILE}")
-
 
 if __name__ == "__main__":
     main()
+
+    print(f"Predictions saved to {OUTPUT_FILE}")
