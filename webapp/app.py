@@ -149,6 +149,7 @@ if model_choice == "Home":
     """)
 
 # --- MODEL 1: TRADITIONAL ML ---
+# --- MODEL 1: TRADITIONAL ML ---
 elif model_choice == "Model 1: Traffic Severity (ML)":
     st.header("🚦 Traffic Accident Severity Prediction")
     st.write("Analyze environmental factors to predict accident impact.")
@@ -161,20 +162,22 @@ elif model_choice == "Model 1: Traffic Severity (ML)":
         speed_limit = st.slider("Speed Limit (mph)", 25, 75, 45)
         time_of_day = st.selectbox("Time Window", ["Morning", "Afternoon", "Evening", "Night"])
 
-if st.button("Calculate Severity Risk"):
+    if st.button("Calculate Severity Risk"):
         try:
+            # Load assets (ensure these paths match your repo structure)
             model, scaler, le, feature_cols = load_ml_model()
 
-            # 1. Initialize all 98+ features to 0
+            # 1. Initialize all features from your joblib to 0
             row = {col: 0 for col in feature_cols}
 
-            # 2. Map Time & Basic Metrics
+            # 2. Time-based Calculations
             hour = {"Morning": 8, "Afternoon": 14, "Evening": 17, "Night": 22}[time_of_day]
             is_morning_rush = int(7 <= hour <= 9)
             is_evening_rush = int(16 <= hour <= 19)
 
+            # 3. Update core numeric and boolean features
             row.update({
-                "Distance(mi)": speed_limit / 45.0, # Scaled relative to your slider default
+                "Distance(mi)": speed_limit / 45.0, 
                 "is_morning_rush": is_morning_rush,
                 "is_evening_rush": is_evening_rush,
                 "is_rush_hour": int(is_morning_rush or is_evening_rush),
@@ -186,43 +189,53 @@ if st.button("Calculate Severity Risk"):
                 "DangerousScore": (5 if weather == "Snow" else 2 if weather != "Clear" else 0) + (3 if speed_limit > 60 else 0)
             })
 
-            # 3. Map your REAL Weather Clusters
+            # 4. Map to your EXACT "weather_cluster" columns
             if weather == "Clear": row["weather_cluster_clear"] = 1
             if weather == "Rain":  row["weather_cluster_rain"] = 1
             if weather == "Snow":  row["weather_cluster_snow_ice"] = 1
             if weather == "Fog":   row["weather_cluster_low_visibility"] = 1
 
-            # 4. Map Road Category to "Word" Keywords (Model Signal)
-            # Since your model was trained on text, "Highway" implies words like 'exit' or 'lane'
+            # 5. Map UI selections to the "word_" keyword columns the model expects
             if road_type == "Highway":
                 row["word_exit"] = 1
                 row["word_lane"] = 1
             if speed_limit > 60:
                 row["word_crash"] = 1
                 row["word_blocked"] = 1
+                row["word_incident"] = 1
             else:
                 row["word_slow"] = 1
+                row["word_traffic"] = 1
 
-            # 5. Provide a Location (Crucial for avoiding 'Severity 2' bias)
-            # Models are biased toward the geography they saw most.
+            # 6. Set Location Defaults (West/LA) to provide context for the model
             row["City_los angeles"] = 1
+            row["Cty_los angeles"] = 1
             row["region_West"] = 1
             row["wind_calm"] = 1
 
-            # 6. Final Processing
+            # 7. Convert to DataFrame with EXACT training column order
             X = pd.DataFrame([row])[feature_cols]
-            X_scaled = scaler.transform(X)
             
+            # 8. Scale and Predict
+            X_scaled = scaler.transform(X)
             proba = model.predict_proba(X_scaled)[0]
+            
+            # 9. Get the highest probability class
             pred_enc = np.argmax(proba)
             prediction = le.inverse_transform([pred_enc])[0]
             conf = float(proba[pred_enc])
 
+            # Output display
             st.divider()
             st.metric("Risk Level", f"Severity {prediction}", delta=f"{conf:.1%} Confidence")
+            
+            if prediction > 2:
+                st.warning("⚠️ High impact predicted. Alerting emergency dispatch units.")
+            else:
+                st.info("✅ Moderate impact. Routine traffic response recommended.")
 
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Error executing Model 1: {e}")
 
 # --- MODEL 2: DEEP LEARNING ---
 elif model_choice == "Model 2: Resource Allocation (DNN)":
