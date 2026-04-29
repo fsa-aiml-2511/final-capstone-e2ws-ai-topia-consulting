@@ -164,49 +164,57 @@ elif model_choice == "Model 1: Traffic Severity (ML)":
 if st.button("Calculate Severity Risk"):
         try:
             model, scaler, le, feature_cols = load_ml_model()
-            st.write("### Debug: Model Expects These Columns", feature_cols)
-            # 1. Initialize a full row of zeros matching your 98+ training features
+
+            # 1. Initialize all 98+ features to 0
             row = {col: 0 for col in feature_cols}
 
-            # 2. Time-based calculations
+            # 2. Map Time & Basic Metrics
             hour = {"Morning": 8, "Afternoon": 14, "Evening": 17, "Night": 22}[time_of_day]
             is_morning_rush = int(7 <= hour <= 9)
             is_evening_rush = int(16 <= hour <= 19)
 
-            # 3. Update the dictionary with UI inputs and calculated fields
-            # Note: Using .update ensures we only touch the features that exist in your joblib
             row.update({
-                "Distance(mi)": speed_limit / 50.0,
-                "Temperature(F)": 32.0 if weather == "Snow" else 65.0, # Heuristic values
+                "Distance(mi)": speed_limit / 45.0, # Scaled relative to your slider default
                 "is_morning_rush": is_morning_rush,
                 "is_evening_rush": is_evening_rush,
                 "is_rush_hour": int(is_morning_rush or is_evening_rush),
                 "is_freezing": int(weather == "Snow"),
                 "low_visibility_severity": int(weather == "Fog"),
                 "has_precipitation": int(weather in ("Rain", "Snow")),
-                "n_road_features": {"Local": 1, "Arterial": 3, "Highway": 2}[road_type],
-                "has_traffic_control": {"Local": 0, "Arterial": 1, "Highway": 0}[road_type],
-                "DangerousScore": (2 if weather == "Snow" else 1 if weather in ("Rain", "Fog") else 0)
-                                  + int(is_morning_rush or is_evening_rush)
-                                  + int(speed_limit >= 65),
+                "n_road_features": {"Local": 1, "Arterial": 2, "Highway": 4}[road_type],
+                "has_traffic_control": int(road_type == "Arterial"),
+                "DangerousScore": (5 if weather == "Snow" else 2 if weather != "Clear" else 0) + (3 if speed_limit > 60 else 0)
             })
 
-            # 4. Map Categorical UI selections to One-Hot columns (e.g., Weather_Condition_Rain)
-            weather_col = f"Weather_Condition_{weather}"
-            road_col = f"Road_Type_{road_type}"
-            
-            if weather_col in row: row[weather_col] = 1
-            if road_col in row: row[road_col] = 1
+            # 3. Map your REAL Weather Clusters
+            if weather == "Clear": row["weather_cluster_clear"] = 1
+            if weather == "Rain":  row["weather_cluster_rain"] = 1
+            if weather == "Snow":  row["weather_cluster_snow_ice"] = 1
+            if weather == "Fog":   row["weather_cluster_low_visibility"] = 1
 
-            # 5. Create DataFrame and enforce the exact column order from training
+            # 4. Map Road Category to "Word" Keywords (Model Signal)
+            # Since your model was trained on text, "Highway" implies words like 'exit' or 'lane'
+            if road_type == "Highway":
+                row["word_exit"] = 1
+                row["word_lane"] = 1
+            if speed_limit > 60:
+                row["word_crash"] = 1
+                row["word_blocked"] = 1
+            else:
+                row["word_slow"] = 1
+
+            # 5. Provide a Location (Crucial for avoiding 'Severity 2' bias)
+            # Models are biased toward the geography they saw most.
+            row["City_los angeles"] = 1
+            row["region_West"] = 1
+            row["wind_calm"] = 1
+
+            # 6. Final Processing
             X = pd.DataFrame([row])[feature_cols]
-            
-            # 6. Scale and Predict
             X_scaled = scaler.transform(X)
+            
             proba = model.predict_proba(X_scaled)[0]
             pred_enc = np.argmax(proba)
-            
-            # 7. Inverse transform to get "Severity 1", "Severity 2", etc.
             prediction = le.inverse_transform([pred_enc])[0]
             conf = float(proba[pred_enc])
 
@@ -214,7 +222,7 @@ if st.button("Calculate Severity Risk"):
             st.metric("Risk Level", f"Severity {prediction}", delta=f"{conf:.1%} Confidence")
 
         except Exception as e:
-            st.error(f"Error executing Model 1 prediction: {e}")
+            st.error(f"Error: {e}")
 
 # --- MODEL 2: DEEP LEARNING ---
 elif model_choice == "Model 2: Resource Allocation (DNN)":
