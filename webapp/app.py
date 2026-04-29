@@ -149,6 +149,17 @@ if model_choice == "Home":
     """)
 
 # --- MODEL 1: TRADITIONAL ML ---
+elif model_choice == "Model 1: Traffic Severity (ML)":
+    st.header("🚦 Traffic Accident Severity Prediction")
+    st.write("Analyze environmental factors to predict accident impact.")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        road_type = st.selectbox("Road Category", ["Local", "Arterial", "Highway"])
+        weather = st.selectbox("Weather", ["Clear", "Rain", "Snow", "Fog"])
+    with col2:
+        speed_limit = st.slider("Speed Limit (mph)", 25, 75, 45)
+        time_of_day = st.selectbox("Time Window", ["Morning", "Afternoon", "Evening", "Night"])
 if st.button("Calculate Severity Risk"):
         try:
             model, scaler, le, feature_cols = load_ml_model()
