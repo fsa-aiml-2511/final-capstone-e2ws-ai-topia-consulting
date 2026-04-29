@@ -161,47 +161,60 @@ elif model_choice == "Model 1: Traffic Severity (ML)":
         speed_limit = st.slider("Speed Limit (mph)", 25, 75, 45)
         time_of_day = st.selectbox("Time Window", ["Morning", "Afternoon", "Evening", "Night"])
 
-    if st.button("Calculate Severity Risk"):
+if st.button("Calculate Severity Risk"):
         try:
             model, scaler, le, feature_cols = load_ml_model()
 
+            # 1. Initialize a full row of zeros matching your 98+ training features
+            row = {col: 0 for col in feature_cols}
+
+            # 2. Time-based calculations
             hour = {"Morning": 8, "Afternoon": 14, "Evening": 17, "Night": 22}[time_of_day]
             is_morning_rush = int(7 <= hour <= 9)
             is_evening_rush = int(16 <= hour <= 19)
 
-            overrides = {
-                "Distance(mi)":                   speed_limit / 50.0,
-                "is_morning_rush":                is_morning_rush,
-                "is_evening_rush":                is_evening_rush,
-                "is_rush_hour":                   int(is_morning_rush or is_evening_rush),
-                "is_freezing":                    int(weather == "Snow"),
-                "low_visibility_severity":        int(weather == "Fog"),
-                "has_precipitation":              int(weather in ("Rain", "Snow")),
-                "weather_cluster_clear":          int(weather == "Clear"),
-                "weather_cluster_rain":           int(weather == "Rain"),
-                "weather_cluster_snow_ice":       int(weather == "Snow"),
-                "weather_cluster_low_visibility": int(weather == "Fog"),
-                "n_road_features":                {"Local": 1, "Arterial": 3, "Highway": 2}[road_type],
-                "has_traffic_control":            {"Local": 0, "Arterial": 1, "Highway": 0}[road_type],
-                "DangerousScore":                 (2 if weather == "Snow" else 1 if weather in ("Rain", "Fog") else 0)
-                                                  + int(is_morning_rush or is_evening_rush)
-                                                  + int(speed_limit >= 65),
-            }
+            # 3. Update the dictionary with UI inputs and calculated fields
+            # Note: Using .update ensures we only touch the features that exist in your joblib
+            row.update({
+                "Distance(mi)": speed_limit / 50.0,
+                "Temperature(F)": 32.0 if weather == "Snow" else 65.0, # Heuristic values
+                "is_morning_rush": is_morning_rush,
+                "is_evening_rush": is_evening_rush,
+                "is_rush_hour": int(is_morning_rush or is_evening_rush),
+                "is_freezing": int(weather == "Snow"),
+                "low_visibility_severity": int(weather == "Fog"),
+                "has_precipitation": int(weather in ("Rain", "Snow")),
+                "n_road_features": {"Local": 1, "Arterial": 3, "Highway": 2}[road_type],
+                "has_traffic_control": {"Local": 0, "Arterial": 1, "Highway": 0}[road_type],
+                "DangerousScore": (2 if weather == "Snow" else 1 if weather in ("Rain", "Fog") else 0)
+                                  + int(is_morning_rush or is_evening_rush)
+                                  + int(speed_limit >= 65),
+            })
 
-            expected = list(model.get_booster().feature_names)
-            row = {col: overrides.get(col, 0) for col in expected}
-            X = pd.DataFrame([row])[expected]
+            # 4. Map Categorical UI selections to One-Hot columns (e.g., Weather_Condition_Rain)
+            weather_col = f"Weather_Condition_{weather}"
+            road_col = f"Road_Type_{road_type}"
+            
+            if weather_col in row: row[weather_col] = 1
+            if road_col in row: row[road_col] = 1
+
+            # 5. Create DataFrame and enforce the exact column order from training
+            X = pd.DataFrame([row])[feature_cols]
+            
+            # 6. Scale and Predict
             X_scaled = scaler.transform(X)
-
-            proba      = model.predict_proba(X_scaled)[0]
-            pred_enc   = np.argmax(proba)
+            proba = model.predict_proba(X_scaled)[0]
+            pred_enc = np.argmax(proba)
+            
+            # 7. Inverse transform to get "Severity 1", "Severity 2", etc.
             prediction = le.inverse_transform([pred_enc])[0]
-            conf       = float(proba[pred_enc])
+            conf = float(proba[pred_enc])
 
             st.divider()
             st.metric("Risk Level", f"Severity {prediction}", delta=f"{conf:.1%} Confidence")
+
         except Exception as e:
-            st.error(f"Error loading Model 1: {e}")
+            st.error(f"Error executing Model 1 prediction: {e}")
 
 # --- MODEL 2: DEEP LEARNING ---
 elif model_choice == "Model 2: Resource Allocation (DNN)":
