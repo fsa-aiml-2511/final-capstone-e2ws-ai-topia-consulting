@@ -164,7 +164,7 @@ elif model_choice == "Model 1: Traffic Severity (ML)":
 if st.button("Calculate Severity Risk"):
         try:
             model, scaler, le, feature_cols = load_ml_model()
-
+            st.write("### Debug: Model Expects These Columns", feature_cols)
             # 1. Initialize a full row of zeros matching your 98+ training features
             row = {col: 0 for col in feature_cols}
 
