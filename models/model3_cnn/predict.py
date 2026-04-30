@@ -1,80 +1,119 @@
 #!/usr/bin/env python3
 """
-Model 3: CNN — Prediction Script
-==================================
-Loads your trained model and generates predictions on test data.
+Model 3: Pothole Detection — Prediction Script
+===============================================
+Loads the trained EfficientNetB0 model and predicts pothole vs. no_pothole
+for images in test_data/.
 
-Usage: python predict.py
-Output: test_data/model3_results.csv
+Artifacts expected in models/model3_cnn/saved_model/:
+  model.keras, threshold.joblib, metrics.joblib
+
+To run from project root:
+    python -u models/model3_cnn/predict.py
 """
-import pandas as pd
+
+from __future__ import annotations
+
+import logging
+import sys
 from pathlib import Path
 
-# Paths
-MODEL_PATH = Path("models/model3_cnn/saved_model/")
-TEST_DATA_DIR = Path("test_data/")
-OUTPUT_FILE = TEST_DATA_DIR / "model3_results.csv"
+import joblib
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+
+PROJECT_ROOT    = Path.cwd()
+MODEL_DIR       = PROJECT_ROOT / "models" / "model3_cnn" / "saved_model"
+TEST_DATA_DIR   = PROJECT_ROOT / "test_data"
+OUTPUT_FILE     = TEST_DATA_DIR / "model3_cnn_results.csv"
+
+IMG_SIZE = 384
 
 
-def load_model():
-    """Load your trained CNN model from saved_model/.
-
-    TensorFlow / Keras:
-        import tensorflow as tf
-        model = tf.keras.models.load_model(MODEL_PATH / "model.keras")
-    """
-    # TODO: Load your saved model
-    raise NotImplementedError("Load your trained model here")
-
-
-def load_and_preprocess_images(image_dir):
-    """Load images from the test_data/ image folder and apply transforms.
-
-    Example using Keras:
-        from tensorflow.keras.preprocessing.image import load_img, img_to_array
-        import numpy as np
-
-        images, ids = [], []
-        for img_path in sorted(Path(image_dir).glob("*.png")):
-            img = load_img(img_path, target_size=(224, 224))
-            img_array = img_to_array(img) / 255.0
-            images.append(img_array)
-            ids.append(img_path.name)
-        return np.array(images), ids
-    """
-    # TODO: Load and preprocess images
-    raise NotImplementedError("Load and preprocess images here")
+def setup_logging() -> logging.Logger:
+    logger = logging.getLogger("model3_predict")
+    logger.setLevel(logging.INFO)
+    if logger.handlers:
+        return logger
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter(
+        fmt="%(asctime)s | %(levelname)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    logger.addHandler(handler)
+    logger.propagate = False
+    return logger
 
 
-def predict(model, images):
-    """Generate predictions on image data.
+def load_artifacts(logger: logging.Logger):
+    required = ["model.keras", "threshold.joblib"]
+    missing  = [f for f in required if not (MODEL_DIR / f).exists()]
+    if missing:
+        raise FileNotFoundError(
+            f"Missing artifacts in {MODEL_DIR}: {missing}\n"
+            "Run train.py first to generate them."
+        )
+    logger.info("Loading model from %s", MODEL_DIR)
+    model     = tf.keras.models.load_model(MODEL_DIR / "model.keras")
+    threshold = joblib.load(MODEL_DIR / "threshold.joblib")
+    logger.info("Threshold: %.2f", threshold)
+    return model, threshold
 
-    Should return a DataFrame with columns: image_id, predicted_class, confidence
-    """
-    # TODO: Run your model on the images
-    raise NotImplementedError("Generate predictions here")
+
+def crop_road_region(img):
+    h  = tf.shape(img)[0]
+    w  = tf.shape(img)[1]
+    y1 = tf.cast(tf.cast(h, tf.float32) * 0.30, tf.int32)
+    y2 = tf.cast(tf.cast(h, tf.float32) * 0.78, tf.int32)
+    x1 = tf.cast(tf.cast(w, tf.float32) * 0.05, tf.int32)
+    x2 = tf.cast(tf.cast(w, tf.float32) * 0.95, tf.int32)
+    return img[y1:y2, x1:x2, :]
+
+
+def preprocess_image(img_path: str) -> np.ndarray:
+    preprocess_input = tf.keras.applications.efficientnet.preprocess_input
+    img = tf.io.read_file(img_path)
+    img = tf.image.decode_jpeg(img, channels=3)
+    img = tf.image.convert_image_dtype(img, tf.float32)
+    img = crop_road_region(img)
+    img = tf.image.resize(img, (IMG_SIZE, IMG_SIZE))
+    img = preprocess_input(img * 255.0)
+    return tf.expand_dims(img, axis=0).numpy()
+
+
+def predict_batch(image_paths: list, model, threshold: float) -> pd.DataFrame:
+    results = []
+    for path in image_paths:
+        try:
+            img_array = preprocess_image(path)
+            prob      = float(model.predict(img_array, verbose=0)[0][0])
+            label     = "pothole" if prob >= threshold else "no_pothole"
+            results.append({"image_id": Path(path).name, "predicted_class": label, "confidence": round(prob, 4)})
+        except Exception as e:
+            results.append({"image_id": Path(path).name, "predicted_class": "error", "confidence": 0.0})
+    return pd.DataFrame(results)
 
 
 def main():
-    # Load model
-    model = load_model()
+    logger = setup_logging()
+    model, threshold = load_artifacts(logger)
 
-    # Load test images from test_data/ image folder
-    # TODO: Update this path to match your test image folder
-    # images, image_ids = load_and_preprocess_images(TEST_DATA_DIR / "images")
+    image_exts = {".jpg", ".jpeg", ".png"}
+    image_paths = [
+        str(p) for p in TEST_DATA_DIR.iterdir()
+        if p.suffix.lower() in image_exts
+    ]
+    if not image_paths:
+        raise FileNotFoundError(f"No images found in {TEST_DATA_DIR}")
+    logger.info("Found %d images", len(image_paths))
 
-    # Generate predictions
-    # predictions = predict(model, images)
+    results = predict_batch(image_paths, model, threshold)
 
-    # Save results — MUST match output template exactly
-    # results = pd.DataFrame({
-    #     "image_id": image_ids,
-    #     "predicted_class": predicted_classes,
-    #     "confidence": confidence_scores,
-    # })
-    # results.to_csv(OUTPUT_FILE, index=False)
-
-    print(f"Predictions saved to {OUTPUT_FILE}")
+    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    results.to_csv(OUTPUT_FILE, index=False)
+    logger.info("Predictions saved to %s", OUTPUT_FILE)
+    print(results.to_string(index=False))
 
 
 if __name__ == "__main__":
