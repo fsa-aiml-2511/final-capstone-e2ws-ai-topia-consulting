@@ -2,9 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from PIL import Image
-import pandas as pd
-import numpy as np
-from PIL import Image
 from pathlib import Path
 from scipy.sparse import csr_matrix
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -19,10 +16,16 @@ class ExtraTextFeatures(BaseEstimator, TransformerMixin):
     def transform(self, X):
         s = pd.Series(X).fillna("").astype(str).str.lower()
         extra = pd.DataFrame({
-            "is_driveway": s.str.contains(r"\bdriveway\b", regex=True).astype(int),
-            "is_parking":  s.str.contains(r"\bparking\b|\bparked\b|\bvehicle\b|\bcar\b", regex=True).astype(int),
-            "is_blocked":  s.str.contains(r"\bblocked\b|\bblocking\b", regex=True).astype(int),
-            "is_noise":    s.str.contains(r"\bbanging\b|\bpounding\b|\bloud\b|\bmusic\b", regex=True).astype(int),
+            "has_snow_or_ice":   s.str.contains(r"\bsnow\b|\bice\b|\bicy\b|\bslush\b", regex=True).astype(int),
+            "has_sanitation":    s.str.contains(r"\btrash\b|\bgarbage\b|\brecycling\b|\bsanitation\b|\bdumping\b", regex=True).astype(int),
+            "has_driveway":      s.str.contains(r"\bdriveway\b", regex=True).astype(int),
+            "has_blocked":       s.str.contains(r"\bblocked\b|\bblocking\b|\bobstructing\b", regex=True).astype(int),
+            "has_parking":       s.str.contains(r"\bparking\b|\bparked\b|\bvehicle\b|\bcar\b|\btruck\b|\bdouble parked\b|\bhydrant\b", regex=True).astype(int),
+            "has_noise":         s.str.contains(r"\bnoise\b|\bloud\b|\bmusic\b|\bbanging\b|\byelling\b|\bparty\b", regex=True).astype(int),
+            "has_heat_hot_water":s.str.contains(r"\bno heat\b|\bheat\b|\bheating\b|\bhot water\b|\bboiler\b|\bradiator\b", regex=True).astype(int),
+            "has_housing":       s.str.contains(r"\bapartment\b|\btenant\b|\blandlord\b|\bresidential\b", regex=True).astype(int),
+            "has_dob_signal":    s.str.contains(r"\bconstruction\b|\bpermit\b|\bscaffold\b|\bdemolition\b|\bunsafe construction\b", regex=True).astype(int),
+            "has_oos_signal":    s.str.contains(r"\bsheriff\b|\bmarshal\b|\beviction\b|\blockout\b|\bcivil enforcement\b", regex=True).astype(int),
         })
         return csr_matrix(extra.values)
 
@@ -104,125 +107,47 @@ def _urgency_tier(urgent: int, distress: int, moderate: int):
 st.set_page_config(
     page_title="UrbanPulse Analytics | Nova Haven",
     page_icon="🏙️",
-    page_title="UrbanPulse Analytics | Nova Haven",
-    page_icon="🏙️",
     layout="wide",
 )
 st.markdown("""
     <style>
-    /* Use Streamlit's native background and text variables */
     .stApp {
         background-color: var(--background-color);
         color: var(--text-color);
     }
-
-    /* Sidebar - uses a slightly offset transparency to look good on both */
     section[data-testid="stSidebar"] {
         background-color: rgba(151, 166, 195, 0.1) !important;
     }
-
-    /* Metric Cards - adapt border and background to theme */
     [data-testid="stMetric"] {
         background-color: var(--secondary-background-color);
         border: 1px solid rgba(128, 128, 128, 0.2);
         padding: 15px;
         border-radius: 10px;
     }
-
-    /* Labels - Use secondary text color for a subtle look */
     [data-testid="stMetricLabel"] p {
         color: var(--text-color) !important;
         opacity: 0.8;
         font-size: 1rem !important;
     }
-
-    /* Values - Use Primary accent color for consistency */
     [data-testid="stMetricValue"] div {
         color: var(--primary-color) !important;
         font-weight: bold !important;
     }
-
-    /* Headers - Use Primary accent color */
     h1, h2, h3 {
         color: var(--primary-color) !important;
     }
-
-    /* Buttons - Use Primary color and automatically adjust text contrast */
     .stButton>button {
         background-color: var(--primary-color);
-        color: white; /* Streamlit buttons usually handle contrast automatically, but white is safe for primary */
+        color: white;
         border: none;
         width: 100%;
     }
-    
-    /* Optional: Hover effect for buttons using the primary color with filter */
     .stButton>button:hover {
         filter: brightness(0.9);
         color: white;
     }
     </style>
     """, unsafe_allow_html=True)
-
-
-# Sidebar Branding
-st.sidebar.title("🏙️ UrbanPulse")
-st.sidebar.markdown("---")
-
-st.markdown("""
-    <style>
-    /* Use Streamlit's native background and text variables */
-    .stApp {
-        background-color: var(--background-color);
-        color: var(--text-color);
-    }
-
-    /* Sidebar - uses a slightly offset transparency to look good on both */
-    section[data-testid="stSidebar"] {
-        background-color: rgba(151, 166, 195, 0.1) !important;
-    }
-
-    /* Metric Cards - adapt border and background to theme */
-    [data-testid="stMetric"] {
-        background-color: var(--secondary-background-color);
-        border: 1px solid rgba(128, 128, 128, 0.2);
-        padding: 15px;
-        border-radius: 10px;
-    }
-
-    /* Labels - Use secondary text color for a subtle look */
-    [data-testid="stMetricLabel"] p {
-        color: var(--text-color) !important;
-        opacity: 0.8;
-        font-size: 1rem !important;
-    }
-
-    /* Values - Use Primary accent color for consistency */
-    [data-testid="stMetricValue"] div {
-        color: var(--primary-color) !important;
-        font-weight: bold !important;
-    }
-
-    /* Headers - Use Primary accent color */
-    h1, h2, h3 {
-        color: var(--primary-color) !important;
-    }
-
-    /* Buttons - Use Primary color and automatically adjust text contrast */
-    .stButton>button {
-        background-color: var(--primary-color);
-        color: white; /* Streamlit buttons usually handle contrast automatically, but white is safe for primary */
-        border: none;
-        width: 100%;
-    }
-    
-    /* Optional: Hover effect for buttons using the primary color with filter */
-    .stButton>button:hover {
-        filter: brightness(0.9);
-        color: white;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
 
 # Sidebar Branding
 st.sidebar.title("🏙️ UrbanPulse")
@@ -230,21 +155,13 @@ st.sidebar.markdown("---")
 
 model_choice = st.sidebar.selectbox(
     "Select Intelligence Module",
-    "Select Intelligence Module",
     [
-        "Home", 
-        "Model 1: Traffic Severity (ML)", 
-        "Model 2: Resource Allocation (DNN)", 
-        "Model 3: Road Inspection (CNN)", 
-        "Model 4: 311 Classifier (NLP)", 
-        "Model 5: Innovation Module"
-    ]
-        "Home", 
-        "Model 1: Traffic Severity (ML)", 
-        "Model 2: Resource Allocation (DNN)", 
-        "Model 3: Road Inspection (CNN)", 
-        "Model 4: 311 Classifier (NLP)", 
-        "Model 5: Innovation Module"
+        "Home",
+        "Model 1: Traffic Severity (ML)",
+        "Model 2: Resource Allocation (DNN)",
+        "Model 3: Road Inspection (CNN)",
+        "Model 4: 311 Classifier (NLP)",
+        "Model 5: Innovation Module",
     ]
 )
 
@@ -344,7 +261,6 @@ def load_innovation_model():
         joblib.load(s + "time_le.joblib"),
         joblib.load(s + "metrics.joblib"),
     )
-
 
 # ===========================================================================
 # 3. ROUTING & PAGES
@@ -824,8 +740,8 @@ elif model_choice == "Model 4: 311 Classifier (NLP)":
             confidence    = float(route_proba.max())
 
             # Complaint category
-            cat_encoded   = category_pipeline.predict([cleaned])[0]
-            category      = category_le.inverse_transform([cat_encoded])[0].title()
+            cat_encoded = category_pipeline.predict([cleaned])[0]
+            category    = category_le.inverse_transform([cat_encoded])[0].title()
 
             st.divider()
             c1, c2, c3 = st.columns(3)

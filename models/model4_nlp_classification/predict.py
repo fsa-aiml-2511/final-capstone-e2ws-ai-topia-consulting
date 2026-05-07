@@ -39,7 +39,7 @@ ROUTING_LABEL_FILE = MODEL_DIR / "model4_routing_label_encoder.pkl"
 
 
 class ExtraTextFeatures(BaseEstimator, TransformerMixin):
-    """Custom transformer — must match the version used during training."""
+    """Must match train.py exactly — column count/order determines feature dimension."""
 
     def fit(self, X, y=None):
         return self
@@ -47,10 +47,16 @@ class ExtraTextFeatures(BaseEstimator, TransformerMixin):
     def transform(self, X):
         s = pd.Series(X).fillna("").astype(str).str.lower()
         extra = pd.DataFrame({
-            "is_driveway": s.str.contains(r"\bdriveway\b", regex=True).astype(int),
-            "is_parking":  s.str.contains(r"\bparking\b|\bparked\b|\bvehicle\b|\bcar\b", regex=True).astype(int),
-            "is_blocked":  s.str.contains(r"\bblocked\b|\bblocking\b", regex=True).astype(int),
-            "is_noise":    s.str.contains(r"\bbanging\b|\bpounding\b|\bloud\b|\bmusic\b", regex=True).astype(int),
+            "has_snow_or_ice":   s.str.contains(r"\bsnow\b|\bice\b|\bicy\b|\bslush\b", regex=True).astype(int),
+            "has_sanitation":    s.str.contains(r"\btrash\b|\bgarbage\b|\brecycling\b|\bsanitation\b|\bdumping\b", regex=True).astype(int),
+            "has_driveway":      s.str.contains(r"\bdriveway\b", regex=True).astype(int),
+            "has_blocked":       s.str.contains(r"\bblocked\b|\bblocking\b|\bobstructing\b", regex=True).astype(int),
+            "has_parking":       s.str.contains(r"\bparking\b|\bparked\b|\bvehicle\b|\bcar\b|\btruck\b|\bdouble parked\b|\bhydrant\b", regex=True).astype(int),
+            "has_noise":         s.str.contains(r"\bnoise\b|\bloud\b|\bmusic\b|\bbanging\b|\byelling\b|\bparty\b", regex=True).astype(int),
+            "has_heat_hot_water":s.str.contains(r"\bno heat\b|\bheat\b|\bheating\b|\bhot water\b|\bboiler\b|\bradiator\b", regex=True).astype(int),
+            "has_housing":       s.str.contains(r"\bapartment\b|\btenant\b|\blandlord\b|\bresidential\b", regex=True).astype(int),
+            "has_dob_signal":    s.str.contains(r"\bconstruction\b|\bpermit\b|\bscaffold\b|\bdemolition\b|\bunsafe construction\b", regex=True).astype(int),
+            "has_oos_signal":    s.str.contains(r"\bsheriff\b|\bmarshal\b|\beviction\b|\blockout\b|\bcivil enforcement\b", regex=True).astype(int),
         })
         return csr_matrix(extra.values)
 
