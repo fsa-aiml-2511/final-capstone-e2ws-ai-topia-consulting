@@ -46,10 +46,12 @@ DATA_PATH       = PROJECT_ROOT / "data" / "raw" / "urbanpulse_311_complaints.csv
 SAVED_MODEL_DIR = PROJECT_ROOT / "models" / "model4_nlp_classification" / "saved_model"
 SAVED_MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
-# Agencies to include — must match the routing label encoder classes
+# OOS (7 samples) and OTI (17 samples) excluded — too few examples for reliable
+# routing; balanced class weighting would inflate them ~60k-25k× and cause them
+# to dominate predictions on free-text input.
 KEEP_AGENCIES = {
     "DCWP", "DEP", "DHS", "DOB", "DOE", "DOHMH",
-    "DOT", "DPR", "DSNY", "HPD", "NYPD", "OOS", "OTI", "TLC",
+    "DOT", "DPR", "DSNY", "HPD", "NYPD", "TLC",
 }
 
 # 6-bucket category mapping — order matters (first match wins)
@@ -113,11 +115,14 @@ def clean_text(text: str) -> str:
 
 
 def build_routing_text(df: pd.DataFrame) -> pd.Series:
-    """Same concatenation used in predict.py — must stay in sync."""
+    """Concatenate complaint_type + descriptor only.
+    resolution_description is excluded: it contains agency names which leak the
+    target label and are never available at inference time (users type free text).
+    Must stay in sync with predict.py and app.py.
+    """
     ct  = df["complaint_type"].fillna("").map(clean_text)
     dsc = df["descriptor"].fillna("").map(clean_text)
-    res = df["resolution_description"].fillna("").map(clean_text) if "resolution_description" in df.columns else pd.Series([""] * len(df), index=df.index)
-    return (ct + " | " + dsc + " | " + res).str.strip(" |")
+    return (ct + " | " + dsc).str.strip(" |")
 
 
 def map_category(complaint_type: str) -> str:
@@ -156,7 +161,6 @@ def build_pipeline(max_word: int = 12_000, max_char: int = 5_000) -> Pipeline:
             alpha=1e-5,
             max_iter=20,
             tol=1e-3,
-            class_weight="balanced",
             random_state=42,
             n_jobs=-1,
         )),

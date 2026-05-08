@@ -97,8 +97,7 @@ def load_artifacts(logger: logging.Logger):
 def build_routing_text(df: pd.DataFrame) -> pd.Series:
     ct  = df.get("complaint_type", pd.Series([""] * len(df), index=df.index)).fillna("").map(clean_text)
     dsc = df.get("descriptor",     pd.Series([""] * len(df), index=df.index)).fillna("").map(clean_text)
-    res = df.get("resolution_description", pd.Series([""] * len(df), index=df.index)).fillna("").map(clean_text)
-    return (ct + " | " + dsc + " | " + res).str.strip(" |")
+    return (ct + " | " + dsc).str.strip(" |")
 
 
 def compute_confidence(model, X_text: pd.Series) -> np.ndarray:
