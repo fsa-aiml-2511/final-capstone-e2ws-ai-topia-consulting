@@ -383,7 +383,7 @@ def load_hourly_points():
 @st.cache_data
 def load_geo_data():
     df = pd.read_csv(
-        "data/raw/city_traffic_accidents.csv",
+        Path(__file__).resolve().parents[1] / "data/raw/city_traffic_accidents.csv",
         usecols=["Start_Lat", "Start_Lng", "Severity", "Zipcode"],
     )
     df = df.dropna(subset=["Start_Lat", "Start_Lng", "Zipcode"])
