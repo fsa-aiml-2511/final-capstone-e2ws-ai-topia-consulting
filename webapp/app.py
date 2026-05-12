@@ -379,7 +379,9 @@ def load_hourly_points():
 def load_geo_data():
     base = Path(__file__).resolve().parents[1]
     hotspots = pd.read_csv(base / "data/processed/geo_hotspots.csv")
-    zip_lookup = pd.read_csv(base / "data/processed/geo_zip_lookup.csv").set_index("Zipcode")
+    zip_df = pd.read_csv(base / "data/processed/geo_zip_lookup.csv", dtype={"Zipcode": str})
+    zip_df["Zipcode"] = zip_df["Zipcode"].str.zfill(5)
+    zip_lookup = zip_df.set_index("Zipcode")
     return hotspots, zip_lookup
 
 

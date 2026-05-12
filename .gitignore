@@ -23,6 +23,8 @@ models/*/saved_model/*.keras
 models/*/saved_model/*.safetensors
 models/*/saved_model/*.bin
 models/*/saved_model/*.onnx
+!models/model3_cnn/saved_model/model.keras
+!models/model4_nlp_classification/saved_model/model4_category_classifier_char_tfidf_SGD.pkl
 
 # Test data (provided by instructor)
 test_data/*.csv
