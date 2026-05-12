@@ -7,7 +7,8 @@
       "Bash(python3 -c \"import pandas as pd; df = pd.read_csv\\('data/processed/city_traffic_processed.csv', nrows=1\\); word_cols = [c for c in df.columns if c.startswith\\('word_'\\)]; print\\(f'Word cols found: {len\\(word_cols\\)}'\\); print\\('\\\\n'.join\\(word_cols\\)\\)\")",
       "Bash(python -c ' *)",
       "Bash(.venv/bin/python -u models/model4_nlp_classification/train.py)",
-      "Bash(.venv/bin/python -c \"import ast; ast.parse\\(open\\('webapp/app.py'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")"
+      "Bash(.venv/bin/python -c \"import ast; ast.parse\\(open\\('webapp/app.py'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")",
+      "Bash(git check-ignore *)"
     ]
   }
 }

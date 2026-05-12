@@ -371,36 +371,15 @@ def load_ml_model():
 
 @st.cache_data
 def load_hourly_points():
-    df = pd.read_csv(
-        Path(__file__).resolve().parents[1] / "data/raw/city_traffic_accidents.csv",
-        usecols=["Start_Lat", "Start_Lng", "Start_Time"],
-    )
-    df["Start_Time"] = pd.to_datetime(df["Start_Time"], errors="coerce")
-    df["hour"] = df["Start_Time"].dt.hour
-    df = df.dropna(subset=["Start_Lat", "Start_Lng", "hour"])
+    base = Path(__file__).resolve().parents[1]
+    df = pd.read_csv(base / "data/processed/hourly_points.csv")
     return [df[df["hour"] == h][["Start_Lat", "Start_Lng"]].values.tolist() for h in range(24)]
 
 @st.cache_data
 def load_geo_data():
-    df = pd.read_csv(
-        Path(__file__).resolve().parents[1] / "data/raw/city_traffic_accidents.csv",
-        usecols=["Start_Lat", "Start_Lng", "Severity", "Zipcode"],
-    )
-    df = df.dropna(subset=["Start_Lat", "Start_Lng", "Zipcode"])
-    df["Zipcode"] = df["Zipcode"].astype(str).str.split("-").str[0].str.zfill(5)
-    hotspots = (
-        df[df["Severity"] >= 3]
-        .groupby("Zipcode")
-        .agg(count=("Severity", "size"), lat=("Start_Lat", "mean"), lon=("Start_Lng", "mean"))
-        .nlargest(30, "count")
-        .reset_index()
-    )
-    zip_lookup = (
-        df.groupby("Zipcode")
-        .agg(lat=("Start_Lat", "mean"), lon=("Start_Lng", "mean"))
-        .reset_index()
-        .set_index("Zipcode")
-    )
+    base = Path(__file__).resolve().parents[1]
+    hotspots = pd.read_csv(base / "data/processed/geo_hotspots.csv")
+    zip_lookup = pd.read_csv(base / "data/processed/geo_zip_lookup.csv").set_index("Zipcode")
     return hotspots, zip_lookup
 
 

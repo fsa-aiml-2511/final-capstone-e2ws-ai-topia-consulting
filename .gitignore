@@ -5,6 +5,9 @@ data/raw/*.parquet
 data/processed/*.csv
 data/processed/*.json
 data/processed/*.parquet
+!data/processed/geo_hotspots.csv
+!data/processed/geo_zip_lookup.csv
+!data/processed/hourly_points.csv
 *.zip
 *.tar.gz
 
