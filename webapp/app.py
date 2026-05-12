@@ -1146,5 +1146,8 @@ elif model_choice == "Model 5: Innovation Module":
 # ===========================================================================
 # 4. FOOTER
 # ===========================================================================
-st.sidebar.markdown("---")
-st.sidebar.caption("© 2026 UrbanPulse Analytics | E2WS AI Topia")
+st.sidebar.markdown(
+    '<div style="position:fixed;bottom:1rem;font-size:0.75rem;color:grey;">'
+    '© 2026 UrbanPulse Analytics | E2WS AI Topia</div>',
+    unsafe_allow_html=True,
+)
