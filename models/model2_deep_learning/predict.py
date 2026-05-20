@@ -64,16 +64,33 @@ def load_artifacts(logger: logging.Logger):
     return model, scaler, label_encoder, feature_cols, thresholds
 
 
-def apply_thresholds(proba: np.ndarray, t0: float = 0.30, t3: float = 0.20) -> np.ndarray:
-    """Priority decode using optimised thresholds saved during training."""
+def apply_thresholds(
+    proba: np.ndarray,
+    t0: float = 0.30,
+    t3: float = 0.20,
+    use_priority_decode: bool = False,
+) -> np.ndarray:
+    """
+    Decode class probabilities into severity labels.
+
+    Default to argmax because the previous priority-threshold decoder could
+    collapse predictions when rare-class probabilities were poorly calibrated.
+    The old threshold behavior remains available only when explicitly enabled
+    in thresholds.joblib with {"use_priority_decode": True}.
+    """
+    if not use_priority_decode:
+        return np.argmax(proba, axis=1)
+
     preds = []
     for row in proba:
-        if row[0] >= t0:
+        top_idx = int(np.argmax(row))
+        top_prob = float(row[top_idx])
+        if row[0] >= t0 and row[0] >= top_prob - 0.05:
             preds.append(0)
-        elif row[3] >= t3:
+        elif row[3] >= t3 and row[3] >= top_prob - 0.05:
             preds.append(3)
         else:
-            preds.append(int(np.argmax(row)))
+            preds.append(top_idx)
     return np.array(preds)
 
 
@@ -89,7 +106,12 @@ def preprocess(df: pd.DataFrame, scaler, feature_cols: list) -> np.ndarray:
 def predict(df: pd.DataFrame, model, scaler, label_encoder, feature_cols, thresholds) -> pd.DataFrame:
     X_scaled     = preprocess(df, scaler, feature_cols)
     proba        = model.predict(X_scaled)
-    pred_encoded = apply_thresholds(proba, thresholds["t0"], thresholds["t3"])
+    pred_encoded = apply_thresholds(
+        proba,
+        thresholds.get("t0", 0.30),
+        thresholds.get("t3", 0.20),
+        thresholds.get("use_priority_decode", False),
+    )
     pred_labels  = label_encoder.inverse_transform(pred_encoded)
     probability  = np.round(proba.max(axis=1), 4)
 

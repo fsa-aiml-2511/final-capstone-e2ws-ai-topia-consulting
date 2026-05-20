@@ -63,6 +63,9 @@ def load_artifacts(logger: logging.Logger):
     ord_enc     = joblib.load(MODEL_DIR / "ord_enc.joblib")
     outcome_le  = joblib.load(MODEL_DIR / "outcome_le.joblib")
     metrics     = joblib.load(MODEL_DIR / "metrics.joblib")
+    for clf in [outcome_clf]:
+        if not hasattr(clf, "multi_class"):
+            clf.multi_class = "auto"
     return outcome_clf, tfidf, ord_enc, outcome_le, metrics
 
 

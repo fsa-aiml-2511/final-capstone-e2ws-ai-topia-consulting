@@ -74,7 +74,8 @@ def crop_road_region(img):
 def preprocess_image(img_path: str) -> np.ndarray:
     preprocess_input = tf.keras.applications.efficientnet.preprocess_input
     img = tf.io.read_file(img_path)
-    img = tf.image.decode_jpeg(img, channels=3)
+    img = tf.image.decode_image(img, channels=3, expand_animations=False)
+    img.set_shape([None, None, 3])
     img = tf.image.convert_image_dtype(img, tf.float32)
     img = crop_road_region(img)
     img = tf.image.resize(img, (IMG_SIZE, IMG_SIZE))
@@ -89,9 +90,11 @@ def predict_batch(image_paths: list, model, threshold: float) -> pd.DataFrame:
             img_array = preprocess_image(path)
             prob      = float(model.predict(img_array, verbose=0)[0][0])
             label     = "pothole" if prob >= threshold else "no_pothole"
-            results.append({"image_id": Path(path).name, "predicted_class": label, "confidence": round(prob, 4)})
+            image_id = str(Path(path).relative_to(TEST_DATA_DIR)).replace("\\", "/")
+            results.append({"image_id": image_id, "predicted_class": label, "confidence": round(prob, 4)})
         except Exception as e:
-            results.append({"image_id": Path(path).name, "predicted_class": "error", "confidence": 0.0})
+            image_id = str(Path(path).relative_to(TEST_DATA_DIR)).replace("\\", "/")
+            results.append({"image_id": image_id, "predicted_class": "error", "confidence": 0.0})
     return pd.DataFrame(results)
 
 
@@ -101,7 +104,7 @@ def main():
 
     image_exts = {".jpg", ".jpeg", ".png"}
     image_paths = [
-        str(p) for p in TEST_DATA_DIR.iterdir()
+        str(p) for p in TEST_DATA_DIR.rglob("*")
         if p.suffix.lower() in image_exts
     ]
     if not image_paths:

@@ -382,6 +382,28 @@ st.markdown("""
     section[data-testid="stSidebar"] h1 {
         display: none;
     }
+    section[data-testid="stSidebar"] [data-testid="stSelectbox"] {
+        background: rgba(255, 255, 255, 0.10);
+        border: 2px solid rgba(167, 243, 208, 0.72);
+        border-radius: 8px;
+        padding: 0.65rem 0.65rem 0.8rem;
+        margin-top: 0.4rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.14);
+    }
+    section[data-testid="stSidebar"] [data-testid="stSelectbox"] label p {
+        color: #ffffff !important;
+        font-weight: 800 !important;
+        font-size: 0.98rem !important;
+    }
+    .up-select-callout {
+        color: #a7f3d0;
+        font-weight: 800;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.25rem;
+    }
     [data-testid="stMetric"] {
         background: var(--up-surface);
         border: 1px solid var(--up-border);
@@ -467,8 +489,9 @@ st.sidebar.markdown(f"[GitHub Portfolio]({GITHUB_PROFILE_URL})")
 st.sidebar.caption("Source profile: SR-algobull")
 st.sidebar.markdown("---")
 
+st.sidebar.markdown('<div class="up-select-callout">Choose a module</div>', unsafe_allow_html=True)
 model_choice = st.sidebar.selectbox(
-    "Select Intelligence Module",
+    "Active dashboard view",
     [
         "Home",
         "Model 1: Traffic Severity (ML)",
@@ -552,9 +575,14 @@ def load_nlp_assets():
 def load_innovation_model():
     import joblib
     s = "models/model5_innovation/saved_model/"
+    outcome_clf = joblib.load(s + "outcome_clf.joblib")
+    time_clf = joblib.load(s + "time_clf.joblib")
+    for clf in (outcome_clf, time_clf):
+        if not hasattr(clf, "multi_class"):
+            clf.multi_class = "auto"
     return (
-        joblib.load(s + "outcome_clf.joblib"),
-        joblib.load(s + "time_clf.joblib"),
+        outcome_clf,
+        time_clf,
         joblib.load(s + "tfidf.joblib"),
         joblib.load(s + "ord_enc.joblib"),
         joblib.load(s + "outcome_le.joblib"),

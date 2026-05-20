@@ -33,6 +33,7 @@ tqdm>=4.65.0
 python-dotenv>=1.0.0
 
 # Geospatial & Mapping
+astral>=3.2,<4.0
 folium>=0.14.0
 uszipcode>=0.2.0
 sqlalchemy-mate<2.0.0
