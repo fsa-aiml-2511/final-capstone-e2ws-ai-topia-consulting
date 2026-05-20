@@ -234,6 +234,8 @@ _URGENT_PATTERNS = [
     r"\bfire\b", r"\bflood\b", r"\bflooding\b", r"\bgas leak\b", r"\bleak\b",
     r"\bsmoke\b", r"\bexplosion\b", r"\bunsafe\b", r"\bdanger\b", r"\bhazard\b",
     r"\bhazardous\b", r"\binjury\b", r"\binjured\b", r"\bblood\b",
+    r"\bdied\b", r"\bdead\b", r"\bdeath\b", r"\bfatal\b", r"\bfatality\b",
+    r"\bpassed away\b", r"\bunconscious\b", r"\bnot breathing\b",
     r"\baccident\b", r"\bcrash\b", r"\bcollapse\b", r"\bsinkhole\b",
     r"\bblocked\b", r"\bno heat\b", r"\bno heating\b", r"\bno water\b", r"\bsewage\b",
     r"\blive wire\b", r"\belectrical\b", r"\bpower outage\b",
@@ -512,12 +514,35 @@ def load_ml_model():
     scaler       = joblib.load("models/model1_traditional_ml/saved_model/scaler.joblib")
     le           = joblib.load("models/model1_traditional_ml/saved_model/label_encoder.joblib")
     feature_cols = joblib.load("models/model1_traditional_ml/saved_model/feature_columns.joblib")
-    if isinstance(le, dict) or len(getattr(le, "classes_", [])) != 4:
-        raise RuntimeError(
-            "Model 1 still has old binary artifacts. Run "
-            "models/model1_traditional_ml/train.py to create the 4-class severity model."
-        )
-    return model, scaler, le, feature_cols
+    is_four_class = not isinstance(le, dict) and len(getattr(le, "classes_", [])) == 4
+    return model, scaler, le, feature_cols, is_four_class
+
+
+def rule_based_severity_1_to_4(road_type, weather, speed_limit, time_of_day, distance_miles):
+    """Temporary app fallback when the checked-in Model 1 artifact is still binary."""
+    speed_points = 4 if speed_limit > 65 else (3 if speed_limit > 55 else (1 if speed_limit > 45 else 0))
+    weather_points = {"Clear": 0, "Rain": 2, "Fog": 2, "Snow": 3}[weather]
+    road_points = {"Local": 0, "High-Capacity Road": 1, "Highway": 2}[road_type]
+    time_points = {"Morning": 1, "Afternoon": 0, "Evening": 1, "Night": 2}[time_of_day]
+    distance_points = 0
+    if distance_miles is not None:
+        distance_points = 2 if distance_miles >= 10 else (1 if distance_miles >= 3 else 0)
+
+    risk_points = speed_points + weather_points + road_points + time_points + distance_points
+    if risk_points <= 1:
+        severity = 1
+    elif risk_points <= 4:
+        severity = 2
+    elif risk_points <= 7:
+        severity = 3
+    else:
+        severity = 4
+
+    labels = np.array([1, 2, 3, 4])
+    soft_scores = np.exp(-np.abs(labels - severity))
+    probabilities = soft_scores / soft_scores.sum()
+    confidence = float(probabilities[severity - 1])
+    return severity, confidence, probabilities, risk_points
 
 @st.cache_data
 def load_hourly_points():
@@ -727,8 +752,40 @@ elif model_choice == "Model 1: Traffic Severity (ML)":
         time_of_day = st.selectbox("Time Window", ["Morning", "Afternoon", "Evening", "Night"])
     if st.button("Predict Severity"):
         try:
-            model, scaler, le, feature_cols = load_ml_model()
+            model, scaler, le, feature_cols, is_four_class = load_ml_model()
             row = {col: 0 for col in feature_cols}
+
+            if not is_four_class:
+                severity, confidence, proba, risk_points = rule_based_severity_1_to_4(
+                    road_type=road_type,
+                    weather=weather,
+                    speed_limit=speed_limit,
+                    time_of_day=time_of_day,
+                    distance_miles=st.session_state.get("zip_dist"),
+                )
+
+                st.info(
+                    "Using a 1-4 severity fallback because the saved Model 1 artifact in GitHub "
+                    "is still the old binary model. Re-run models/model1_traditional_ml/train.py "
+                    "with the raw accident CSV to replace it with the true 4-class model."
+                )
+                st.divider()
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Predicted Severity", f"Severity {severity}")
+                c2.metric("Confidence", f"{confidence:.1%}")
+                c3.metric("Rule Risk Score", risk_points)
+
+                st.markdown("**Severity probabilities**")
+                for label, prob in zip([1, 2, 3, 4], proba):
+                    st.progress(float(prob), text=f"Severity {label} - {prob:.1%}")
+
+                if severity >= 3:
+                    st.error("Predicted severe incident. Prioritize emergency response resources.")
+                elif severity == 2:
+                    st.warning("Predicted moderate incident. Conditions warrant caution.")
+                else:
+                    st.success("Predicted low-severity incident.")
+                st.stop()
 
             # --- Road type → distance & infrastructure features ---
             road_map = {
