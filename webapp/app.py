@@ -398,6 +398,15 @@ st.markdown("""
         font-weight: 800 !important;
         font-size: 0.98rem !important;
     }
+    section[data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"],
+    section[data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] *,
+    section[data-testid="stSidebar"] [data-testid="stSelectbox"] input {
+        color: #111827 !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stSelectbox"] div[data-baseweb="select"] {
+        background-color: #ffffff !important;
+        border-radius: 8px;
+    }
     .up-select-callout {
         color: #a7f3d0;
         font-weight: 800;
