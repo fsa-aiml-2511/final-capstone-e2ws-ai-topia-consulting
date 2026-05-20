@@ -223,6 +223,7 @@ def build_category_text(df: pd.DataFrame) -> pd.Series:
 
 # Default ZIP code for Nova Haven city center — change this to set the map default
 CITY_CENTER_ZIP = "95336"
+GITHUB_PROFILE_URL = "https://github.com/SR-algobull"
 
 # ===========================================================================
 # MODEL 5 — Urgency / keyword analysis helpers (module-level, no ML required)
@@ -341,8 +342,129 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+st.markdown("""
+    <style>
+    :root {
+        --up-primary: #1f6feb;
+        --up-primary-dark: #0f3d73;
+        --up-accent: #14b8a6;
+        --up-surface: rgba(255, 255, 255, 0.76);
+        --up-border: rgba(31, 111, 235, 0.16);
+        --up-text-soft: rgba(49, 63, 83, 0.78);
+    }
+    .stApp {
+        background:
+            linear-gradient(180deg, rgba(241, 247, 255, 0.98) 0%, rgba(248, 250, 252, 1) 38%),
+            var(--background-color);
+    }
+    .block-container {
+        max-width: 1220px;
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0f172a 0%, #123766 100%) !important;
+    }
+    section[data-testid="stSidebar"] * {
+        color: #f8fafc !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        color: rgba(248, 250, 252, 0.78) !important;
+    }
+    section[data-testid="stSidebar"] a {
+        color: #a7f3d0 !important;
+        text-decoration: none;
+        font-weight: 700;
+    }
+    section[data-testid="stSidebar"] hr {
+        border-color: rgba(255, 255, 255, 0.18);
+    }
+    section[data-testid="stSidebar"] h1 {
+        display: none;
+    }
+    [data-testid="stMetric"] {
+        background: var(--up-surface);
+        border: 1px solid var(--up-border);
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.07);
+    }
+    [data-testid="stMetricLabel"] p {
+        color: var(--up-text-soft) !important;
+    }
+    [data-testid="stMetricValue"] div,
+    h1, h2, h3 {
+        color: var(--up-primary-dark) !important;
+        letter-spacing: 0 !important;
+    }
+    .stButton>button {
+        background: linear-gradient(90deg, var(--up-primary), var(--up-accent));
+        border-radius: 8px;
+        font-weight: 700;
+    }
+    .up-hero {
+        padding: 1.25rem 0 1.5rem 0;
+        border-bottom: 1px solid rgba(31, 111, 235, 0.14);
+        margin-bottom: 1.4rem;
+    }
+    .up-eyebrow {
+        color: var(--up-accent);
+        font-weight: 800;
+        text-transform: uppercase;
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.35rem;
+    }
+    .up-title {
+        color: var(--up-primary-dark);
+        font-size: 2.35rem;
+        line-height: 1.1;
+        font-weight: 800;
+        margin: 0;
+    }
+    .up-copy {
+        color: var(--up-text-soft);
+        max-width: 760px;
+        font-size: 1.02rem;
+        line-height: 1.6;
+        margin-top: 0.75rem;
+    }
+    .up-band {
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid var(--up-border);
+        border-radius: 8px;
+        padding: 1rem 1.1rem;
+        margin: 1rem 0;
+    }
+    .up-band strong {
+        color: var(--up-primary-dark);
+    }
+    .up-side-title {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #ffffff;
+        margin-bottom: 0.2rem;
+    }
+    .up-side-copy {
+        color: rgba(248, 250, 252, 0.76);
+        font-size: 0.92rem;
+        line-height: 1.45;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 # Sidebar Branding
+st.sidebar.markdown(
+    """
+    <div class="up-side-title">UrbanPulse</div>
+    <div class="up-side-copy">Nova Haven operations intelligence</div>
+    """,
+    unsafe_allow_html=True,
+)
 st.sidebar.title("🏙️ UrbanPulse")
+st.sidebar.markdown("---")
+st.sidebar.markdown(f"[GitHub Portfolio]({GITHUB_PROFILE_URL})")
+st.sidebar.caption("Source profile: SR-algobull")
 st.sidebar.markdown("---")
 
 model_choice = st.sidebar.selectbox(
@@ -367,6 +489,11 @@ def load_ml_model():
     scaler       = joblib.load("models/model1_traditional_ml/saved_model/scaler.joblib")
     le           = joblib.load("models/model1_traditional_ml/saved_model/label_encoder.joblib")
     feature_cols = joblib.load("models/model1_traditional_ml/saved_model/feature_columns.joblib")
+    if isinstance(le, dict) or len(getattr(le, "classes_", [])) != 4:
+        raise RuntimeError(
+            "Model 1 still has old binary artifacts. Run "
+            "models/model1_traditional_ml/train.py to create the 4-class severity model."
+        )
     return model, scaler, le, feature_cols
 
 @st.cache_data
@@ -441,14 +568,39 @@ def load_innovation_model():
 
 # --- HOME PAGE ---
 if model_choice == "Home":
+    st.markdown(
+        """
+        <section class="up-hero">
+            <div class="up-eyebrow">Nova Haven Smart City Initiative</div>
+            <h1 class="up-title">UrbanPulse Analytics Dashboard</h1>
+            <div class="up-copy">
+                A unified Streamlit interface for traffic severity, resource allocation,
+                road inspection, 311 routing, and complaint-resolution intelligence.
+            </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
     st.title("🏙️ UrbanPulse Analytics Dashboard")
-    st.subheader("Nova Haven Smart City Initiative")
+    st.caption("Portfolio: SR-algobull")
     
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Population", "8.3M")
     col2.metric("Road Miles", "19,000")
     col3.metric("Annual 311s", "3.4M")
     col4.metric("Efficiency Goal", "15% +")
+
+    st.markdown(
+        """
+        <div class="up-band">
+            <strong>Traffic Safety</strong> predicts accident severity to support faster response decisions.<br>
+            <strong>Infrastructure</strong> automates pothole detection from road-surface photos.<br>
+            <strong>Resident Services</strong> routes 311 requests to the right agency.<br>
+            <strong>Innovation</strong> combines resolution prediction with urgency signals for dispatcher review.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.markdown("""
     ---
@@ -545,7 +697,7 @@ elif model_choice == "Model 1: Traffic Severity (ML)":
     with col2:
         speed_limit = st.slider("Speed Limit (mph)", 25, 75, 45)
         time_of_day = st.selectbox("Time Window", ["Morning", "Afternoon", "Evening", "Night"])
-    if st.button("Calculate Severity Risk"):
+    if st.button("Predict Severity"):
         try:
             model, scaler, le, feature_cols = load_ml_model()
             row = {col: 0 for col in feature_cols}
@@ -598,22 +750,25 @@ elif model_choice == "Model 1: Traffic Severity (ML)":
             X_scaled = scaler.transform(X)
             proba = model.predict_proba(X_scaled)[0]
 
-            high_risk_prob = float(proba[1])
-            prediction = "High Risk" if high_risk_prob >= 0.5 else "Standard Risk"
+            pred_idx = int(np.argmax(proba))
+            severity = le.inverse_transform([pred_idx])[0]
+            confidence = float(proba[pred_idx])
 
             st.divider()
             c1, c2 = st.columns(2)
-            c1.metric("Risk Assessment", prediction)
-            c2.metric("High Risk Probability", f"{high_risk_prob:.1%}")
+            c1.metric("Predicted Severity", f"Severity {severity}")
+            c2.metric("Confidence", f"{confidence:.1%}")
 
-            st.progress(high_risk_prob)
+            st.markdown("**Severity probabilities**")
+            for label, prob in zip(le.classes_, proba):
+                st.progress(float(prob), text=f"Severity {label} - {prob:.1%}")
 
-            if high_risk_prob >= 0.5:
-                st.error("High probability of a severe incident (Severity 3 or 4). Exercise extreme caution.")
-            elif high_risk_prob >= 0.25:
-                st.warning("Moderate severe incident risk. Conditions warrant caution.")
+            if int(severity) >= 3:
+                st.error("Predicted severe incident. Prioritize emergency response resources.")
+            elif int(severity) == 2:
+                st.warning("Predicted moderate incident. Conditions warrant caution.")
             else:
-                st.success("Conditions indicate standard risk.")
+                st.success("Predicted low-severity incident.")
 
         except Exception as e:
             st.error(f"Error: {e}")
@@ -1145,9 +1300,18 @@ elif model_choice == "Model 5: Innovation Module":
 
 # ===========================================================================
 # 4. FOOTER
+st.sidebar.markdown(
+    f"""
+    <div style="position:fixed;bottom:1rem;font-size:0.75rem;color:rgba(248,250,252,0.7);">
+        © 2026 UrbanPulse Analytics<br>
+        E2WS AI Topia · <a href="{GITHUB_PROFILE_URL}" target="_blank">GitHub</a>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 # ===========================================================================
 st.sidebar.markdown(
-    '<div style="position:fixed;bottom:1rem;font-size:0.75rem;color:grey;">'
+    '<div style="display:none;">'
     '© 2026 UrbanPulse Analytics | E2WS AI Topia</div>',
     unsafe_allow_html=True,
 )
